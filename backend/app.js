@@ -177,32 +177,54 @@ function analyzeExcelFile(fileBuffer) {
   const allMarks = [];
   
   subjectPairs.forEach((subject, idx) => {
-    const marks = studentData.map(student => {
+    const cieMarks = studentData.map(s => parseFloat(s[subject.cieColumn]) || 0);
+    const seeMarks = studentData.map(s => parseFloat(s[subject.seeColumn]) || 0);
+    const totalMarks = studentData.map(student => {
       const cie = parseFloat(student[subject.cieColumn]) || 0;
       const see = parseFloat(student[subject.seeColumn]) || 0;
       return cie + see;
-    }).filter(m => m > 0);
+    });
     
-    if (marks.length > 0) {
-      const sum = marks.reduce((a, b) => a + b, 0);
-      const avg = sum / marks.length;
-      const max = Math.max(...marks);
-      const min = Math.min(...marks);
-      const passCount = marks.filter(m => m >= 40).length; // Total 40+ is pass
+    const validTotalMarks = totalMarks.filter(m => m > 0);
+    const validCIE = cieMarks.filter(m => m > 0);
+    const validSEE = seeMarks.filter(m => m > 0);
+    
+    if (validTotalMarks.length > 0) {
+      const sum = validTotalMarks.reduce((a, b) => a + b, 0);
+      const avg = sum / validTotalMarks.length;
+      const passCount = validTotalMarks.filter(m => m >= 40).length;
+      
+      // Grade distribution for this subject
+      const fcdCount = totalMarks.filter(m => m >= 70).length;
+      const fcCount = totalMarks.filter(m => m >= 60 && m < 70).length;
+      const scCount = totalMarks.filter(m => m >= 40 && m < 60).length;
       
       subjectStats.push({
         subject: subject.courseCode,
         courseCode: subject.courseCode,
         courseName: subject.courseName,
         average: Math.round(avg * 100) / 100,
-        highest: max,
-        lowest: min,
-        passPercent: Math.round((passCount / marks.length) * 100 * 100) / 100,
+        highest: Math.max(...totalMarks),
+        lowest: Math.min(...validTotalMarks),
+        passPercent: Math.round((passCount / validTotalMarks.length) * 100 * 100) / 100,
         passed: passCount,
-        failed: marks.length - passCount
+        failed: validTotalMarks.length - passCount,
+        appeared: studentData.length,
+        // CIE Statistics
+        maxCIE: Math.max(...cieMarks),
+        minCIE: Math.min(...validCIE),
+        avgCIE: validCIE.length > 0 ? Math.round((validCIE.reduce((a, b) => a + b, 0) / validCIE.length) * 100) / 100 : 0,
+        // SEE Statistics
+        maxSEE: Math.max(...seeMarks),
+        minSEE: Math.min(...validSEE),
+        avgSEE: validSEE.length > 0 ? Math.round((validSEE.reduce((a, b) => a + b, 0) / validSEE.length) * 100) / 100 : 0,
+        // Grade counts
+        fcd: fcdCount,
+        fc: fcCount,
+        sc: scCount
       });
       
-      allMarks.push(...marks);
+      allMarks.push(...validTotalMarks);
     }
   });
   
@@ -279,13 +301,37 @@ function analyzeExcelFile(fileBuffer) {
       usn: student[headers[1]] || '',
       name: student[headers[2]] || student.NAME || '',
       marks: marks,
-      subjects: subjects,  // Added this!
+      subjects: subjects,
       total: Math.round(total * 100) / 100,
       average: Math.round(avg * 100) / 100,
       percentage: percentage,
       grade: grade,
       result: passed ? 'PASS' : 'FAIL'
     };
+  });
+  
+  // Sort students by percentage to assign ranks
+  const sortedStudents = [...students].sort((a, b) => b.percentage - a.percentage);
+  
+  // Assign ranks and colors
+  students.forEach(student => {
+    const rank = sortedStudents.findIndex(s => s.usn === student.usn) + 1;
+    student.rank = rank;
+    
+    // Assign rank colors
+    if (rank === 1) {
+      student.rankColor = '#FFD700'; // Gold
+      student.rankLabel = '🥇 1st';
+    } else if (rank === 2) {
+      student.rankColor = '#C0C0C0'; // Silver
+      student.rankLabel = '🥈 2nd';
+    } else if (rank === 3) {
+      student.rankColor = '#CD7F32'; // Bronze
+      student.rankLabel = '🥉 3rd';
+    } else {
+      student.rankColor = 'transparent';
+      student.rankLabel = rank;
+    }
   });
   
   // Transform data to match renderComprehensiveAnalysis expected format
