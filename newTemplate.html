@@ -96,9 +96,12 @@
     </div>
     <br><br>
     <div class="addStudent">
-        <div class="addStudentBtn"><button type="button" id="addStudentBtn">Add Student</button></div><br>
+        <div class="addStudentBtn" style="display: flex; align-items: center; gap: 15px; justify-content: center; padding: 20px; background: white; border-radius: 8px; border: 1px solid black;">
+            <label for="totalStudents" style="font-weight: bold; color: black; font-size: 16px; width: 400px;">Total Number of Students:</label>
+            <input type="number" id="totalStudents" name="totalStudents" placeholder="Enter count" min="1" max="2000" style="width: 400px; padding: 10px; border: 1px solid black; border-radius: 4px; font-size: 16px; font-weight: bold; text-align: center;">
+        </div><br>
 
-        <div class="addStudentTable">
+        <div class="addStudentTable" style="display: none;">
             <table border="1">
                 <tr>
                     <th style="width: 8%; text-align: left;">S.No</th>

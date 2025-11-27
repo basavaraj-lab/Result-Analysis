@@ -6,6 +6,54 @@
     <title>miniproject</title>
     <link rel="stylesheet" href="style.css">
 </head>
+<style>
+/* #hedDiv {
+    text-align: center;
+    margin-top: 20px;
+    font-weight: bold;
+    font-size: 24px;
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+#hedDiv span {
+    display: inline-block;
+    padding-left: 400px;
+    animation: marquee 6s linear infinite;
+}
+
+@keyframes marquee {
+    0%   { transform: translateX(0%); }
+    100% { transform: translateX(-100%); }
+} */
+
+#hedDiv {
+    width: 600px;           
+    margin: 40px auto;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 24px;
+    font-weight: bold;
+    position: relative;
+}
+
+#hedDiv span {
+    display: inline-block;
+    padding-left: 600px;   /* start outside the right side */
+    animation: continuous 6s linear infinite;
+}
+
+@keyframes continuous {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-1000px); /* move exactly across the box */
+    }
+}
+
+</style>
 <body>
     <div class="navbar">
         <img src="navbar.jpeg" alt="">
@@ -14,15 +62,15 @@
     <!-- data -->
     <div class="data">
         <h3>5 SEMESTER E&C MINI PROJECT-2025-26</h3>
-        <h1>EXAMINATION RESULT ANALYSIS</h1>
+        <div id="hedDiv"><span>EXAMINATION RESULT ANALYSIS</span></div>
     </div>
 
     <div class="doneby">
 
         <div class="doneby-header"><h2>Done By:</h2></div>
-        <h1><pre>Basavaraju R K   4KVE23ECOO7</pre></h1>
-        <h1><pre>Suhan C S        4KVE23ECO47</pre></h1>
-        <h1><pre>Darshan N        4KVE23ECOO9</pre></h1>
+        <h1><pre>Basavaraju R K   4KV23ECOO7</pre></h1>
+        <h1><pre>Suhan C S        4KV23ECO47</pre></h1>
+        <h1><pre>Darshan N        4KV23EC401</pre></h1>
     </div>
 <br>
   <div class="profile" aria-label="Doctor profile">
@@ -34,7 +82,7 @@
 
   <div class="btns">
     <button id="btn1" onclick="goToPage('resultAnalysis.html')">Analysis Examination Result</button>
-    <button id="btn2" onclick="goToPage('DownloadTemplate.html')">Download Template</button>
+    <button id="btn2" onclick="goToPage('Downloadtemplate.html')">Download Template</button>
     <button id="btn3" onclick="goToPage('newTemplate.html')">Create New Template</button>
   </div>
 

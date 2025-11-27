@@ -1,48 +1,3 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>resultAnalysis</title>
-    <link rel="stylesheet" href="style2.css">
-</head>
-<body>
-    <div class="navbar">
-        <img src="navbar.jpeg" alt="">
-    </div>
-    <br><br>
-         data -->
-   <!-- <div class="data">
-        <h3>5 SEMESTER E&C MINI PROJECT-2025-26</h3>
-        <h1>EXAMINATION RESULT ANALYSIS</h1>
-    </div>
-
-    <h2>RESULT ANALYSIS</h2>
-
-    <div class="uploadfile">
-    <div class="file1">Upload Marks(Exel) File:</div>
-       <div class="file2"><input type="file" id="fileInput"></div>
-    </div>
-    <br><br>
-    <div class="analysisBtns">
-        <button id="analyzeBtn">Analyze Result</button>
-        <button id="exportBtn">Export</button>
-        <button id="saveBtn">Save Analysis</button>
-    </div>
-
-    <div class="resultAnalysis">
-
-    </div>
-
-    <div class="footerdiv">
-    <footer>
-    <span class="copy">Copyright ©️ 2025.All rights reserved. Developed by under Skill Lab @E&C, KVGCE</span>
-  </footer>
-    </div>
-</body>
-</html> -->
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,6 +11,10 @@
 
     <!-- XLSX for reading Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
  <style>
     body {
@@ -258,7 +217,7 @@ footer {
 
         <!-- Chart -->
         <div class="chart-section">
-            <h3>📈 Performance Chart</h3>
+            <h3> Performance Chart</h3>
             <canvas id="resultChart"></canvas>
         </div>
     </div>
@@ -271,5 +230,247 @@ footer {
     <!-- JS Files -->
     <script src="renderComprehensive.js"></script>
     <script src="script2.js"></script>
+    
+    <!-- PDF Export Script -->
+    <script>
+    // Wait for DOM to be ready
+    document.addEventListener('DOMContentLoaded', function() {
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', exportToPDF);
+        }
+    });
+
+    async function exportToPDF() {
+        const { jsPDF } = window.jspdf;
+        
+        if (!jsPDF || !window.html2canvas) {
+            alert('PDF/Canvas libraries not loaded. Please try again.');
+            return;
+        }
+
+        try {
+            // Show loading message
+            const originalText = document.getElementById('exportBtn').textContent;
+            document.getElementById('exportBtn').textContent = 'Generating PDF...';
+            document.getElementById('exportBtn').disabled = true;
+
+            // Create new PDF document (landscape for better table display)
+            const pdf = new jsPDF('l', 'mm', 'a4'); // landscape orientation
+            
+            // Get current date
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-IN');
+            const timeStr = now.toLocaleTimeString('en-IN');
+            
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 15;
+            let yPosition = margin;
+
+            // Get the entire result analysis div
+            const resultDiv = document.querySelector('.resultAnalysis');
+            
+            if (!resultDiv || resultDiv.style.display === 'none') {
+                alert('No analysis results to export. Please analyze a file first.');
+                document.getElementById('exportBtn').textContent = originalText;
+                document.getElementById('exportBtn').disabled = false;
+                return;
+            }
+
+            // ==================== PAGE 1: HEADER & OVERVIEW ====================
+            pdf.setFontSize(26);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('COMPREHENSIVE RESULT ANALYSIS', pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 12;
+            
+            pdf.setFontSize(14);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('5th SEMESTER E&C MINI PROJECT - 2025-26', pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 10;
+            
+            pdf.setFontSize(10);
+            pdf.text(`Generated on: ${dateStr} at ${timeStr}`, pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 15;
+
+            // Capture Class Overview section
+            const classOverview = resultDiv.querySelector('div[style*="background: #f0f8ff"]');
+            if (classOverview) {
+                const canvas = await html2canvas(classOverview, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = 300;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+                yPosition += imgHeight + 10;
+            }
+
+            // ==================== GRAPHICAL ANALYSIS ====================
+            pdf.addPage();
+            yPosition = margin;
+            
+            pdf.setFontSize(16);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('GRAPHICAL ANALYSIS', pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 12;
+
+            // Capture all charts
+            const chartsDiv = resultDiv.querySelector('div[style*="display: grid"]');
+            if (chartsDiv) {
+                const canvas = await html2canvas(chartsDiv, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    width: chartsDiv.scrollWidth,
+                    height: chartsDiv.scrollHeight
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = pageWidth - (2 * margin);
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                // Split across pages if needed
+                if (imgHeight > pageHeight - yPosition - 20) {
+                    const firstPageHeight = pageHeight - yPosition - 20;
+                    pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, firstPageHeight);
+                    
+                    pdf.addPage();
+                    yPosition = margin;
+                    const remainingHeight = imgHeight - firstPageHeight;
+                    pdf.addImage(imgData, 'PNG', margin, yPosition - firstPageHeight, imgWidth, imgHeight);
+                    yPosition += remainingHeight + 10;
+                } else {
+                    pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+                    yPosition += imgHeight + 10;
+                }
+            }
+
+            // ==================== SUBJECT-WISE INDICATORS ====================
+            pdf.addPage();
+            yPosition = margin;
+            
+            pdf.setFontSize(16);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('SUBJECT-WISE INDICATORS', pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 12;
+
+            // Find the subject-wise table
+            const tables = resultDiv.querySelectorAll('table');
+            const subjectTable = tables[0]; // First table is subject-wise
+            
+            if (subjectTable) {
+                const canvas = await html2canvas(subjectTable, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = pageWidth - (2 * margin);
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                if (yPosition + imgHeight > pageHeight - 30) {
+                    pdf.addPage();
+                    yPosition = margin;
+                }
+                
+                pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+                yPosition += imgHeight + 10;
+            }
+
+            // ==================== STUDENT-WISE RESULTS ====================
+            pdf.addPage();
+            yPosition = margin;
+            
+            pdf.setFontSize(16);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('STUDENT-WISE RESULTS', pageWidth / 2, yPosition, { align: 'center' });
+            yPosition += 12;
+
+            // Find the student-wise table
+            const studentTable = tables[1]; // Second table is student-wise
+            
+            if (studentTable) {
+                const canvas = await html2canvas(studentTable, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    width: studentTable.scrollWidth,
+                    height: studentTable.scrollHeight
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = pageWidth - (2 * margin);
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                // Handle large table across multiple pages
+                let remainingHeight = imgHeight;
+                let sourceY = 0;
+                
+                while (remainingHeight > 0) {
+                    const availableHeight = pageHeight - yPosition - 35; // Leave space for signature
+                    const heightToAdd = Math.min(remainingHeight, availableHeight);
+                    
+                    // Add portion of image
+                    pdf.addImage(imgData, 'PNG', margin, yPosition - sourceY, imgWidth, imgHeight);
+                    
+                    sourceY += heightToAdd;
+                    remainingHeight -= heightToAdd;
+                    
+                    if (remainingHeight > 0) {
+                        pdf.addPage();
+                        yPosition = margin;
+                    } else {
+                        yPosition += heightToAdd + 10;
+                    }
+                }
+            }
+
+            // ==================== ADD HOD SIGNATURE ====================
+            // Go to last page
+            const totalPages = pdf.internal.getNumberOfPages();
+            pdf.setPage(totalPages);
+            
+            // Position signature at bottom right
+            const signatureY = pageHeight - 25;
+            const signatureX = pageWidth - 70;
+            
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            pdf.line(signatureX, signatureY, signatureX + 50, signatureY); // Signature line
+            pdf.text('HOD Signature', signatureX + 10, signatureY + 5);
+            pdf.setFontSize(8);
+            pdf.text('Head of Department', signatureX + 5, signatureY + 10);
+            pdf.text('E&C Department, KVGCE', signatureX + 2, signatureY + 14);
+
+            // ==================== ADD FOOTER TO ALL PAGES ====================
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'italic');
+            pdf.setTextColor(128, 128, 128);
+            
+            for (let i = 1; i <= totalPages; i++) {
+                pdf.setPage(i);
+                pdf.text('Generated by Result Analysis System | E&C Department, KVGCE', pageWidth / 2, pageHeight - 5, { align: 'center' });
+                pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 30, pageHeight - 5);
+            }
+
+            // Generate filename with timestamp
+            const fileName = `Comprehensive_Result_Analysis_${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}.pdf`;
+            
+            // Save the PDF
+            pdf.save(fileName);
+
+            alert(`✅ PDF EXPORTED SUCCESSFULLY!\n\nFile: ${fileName}\n\nIncluded:\n• Comprehensive Result Analysis\n• Graphical Analysis (All Charts)\n• Subject-wise Indicators\n• Student-wise Results\n• HOD Signature\n\nDownloaded to your Downloads folder.`);
+
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+            alert('❌ Error generating PDF: ' + error.message);
+        } finally {
+            // Reset button
+            document.getElementById('exportBtn').textContent = originalText;
+            document.getElementById('exportBtn').disabled = false;
+        }
+    }
+    </script>
 </body>
 </html>

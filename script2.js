@@ -74,24 +74,28 @@ function analyzeData() {
     selectedFile = file;
 
         // Try a list of possible upload endpoints to support both server variants and different origins
+        // IMPORTANT: Backend server is on port 3000, so try those endpoints FIRST
         const endpoints = [
-            '/api/upload',
-            '/upload',
             'http://localhost:3000/api/upload',
             'http://localhost:3000/upload',
             'http://127.0.0.1:3000/api/upload',
-            'http://127.0.0.1:3000/upload'
+            'http://127.0.0.1:3000/upload',
+            '/api/upload',
+            '/upload'
         ];
 
         const tryUpload = async (i = 0) => {
             if (i >= endpoints.length) {
                 hideLoadingIndicator();
-                alert('Upload failed: no working upload endpoint found');
+                console.error('❌ Upload failed: no working upload endpoint found');
+                console.error('📍 All attempted endpoints:', endpoints);
+                console.error('🌐 Current page origin:', window.location.origin);
+                console.error('📝 Check console above for specific error details for each endpoint');
                 return;
             }
             const url = endpoints[i];
-            console.log(`Attempting upload to: ${url} (current page: ${window.location.origin})`);
-            console.log('FormData contains:', form.has('file') ? 'File present' : 'No file found');
+            console.log(`📤 Attempting upload to: ${url} (current page: ${window.location.origin})`);
+            console.log('📁 FormData contains:', form.has('file') ? 'File present' : 'No file found');
             try {
                 const resp = await fetch(url, { 
                     method: 'POST', 
@@ -99,16 +103,17 @@ function analyzeData() {
                     // Don't set Content-Type header - let browser set it for multipart/form-data
                 });
                 if (resp.status === 405) {
-                    console.warn(`${url} returned 405 (Method Not Allowed), trying next endpoint`);
+                    console.warn(`⚠️ ${url} returned 405 (Method Not Allowed), trying next endpoint`);
                     return tryUpload(i + 1);
                 }
                 if (!resp.ok) {
                     const txt = await resp.text();
+                    console.error(`❌ ${url} returned ${resp.status}: ${txt}`);
                     throw new Error(`Server ${url} returned ${resp.status}: ${txt}`);
                 }
                 const data = await resp.json();
                 hideLoadingIndicator();
-                console.log('Analysis response:', data);
+                console.log('✅ Analysis response received:', data);
                 
                 // Ensure data is valid before rendering
                 if (data && data.success) {
@@ -121,11 +126,13 @@ function analyzeData() {
                 } else if (data && data.summary && data.subjects) {
                     return renderAnalysisFromServer(data);
                 } else {
-                    alert('Received invalid data from server');
-                    console.error('Data received:', data);
+                    console.error('❌ Received invalid data from server');
+                    console.error('📊 Data received:', data);
+                    console.error('🔍 Expected: data.success=true OR (data.summary AND data.subjects)');
+                    return;
                 }
             } catch (err) {
-                console.error(`Upload to ${url} failed:`, err);
+                console.error(`❌ Upload to ${url} failed:`, err);
                 return tryUpload(i + 1);
             }
         };

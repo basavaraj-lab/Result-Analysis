@@ -10,11 +10,19 @@ function renderComprehensiveAnalysis(data) {
     resultDiv.style.visibility = 'visible';
     resultDiv.style.opacity = '1';
 
-    const { classStats, subjectStats, students, subjectNames } = data;
+    const { classStats, subjectStats, students, subjectNames, academicYear, branch, semester } = data;
 
     let html = `
         <div style="padding: 20px; background: white;">
             <h2 style="color: #0078D7; text-align: center;">📊 Comprehensive Result Analysis</h2>
+            
+            <!-- Header Information from Excel -->
+            <div style="margin: 20px 0; padding: 15px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 8px;">
+                <h3 style="color: #856404; margin-top: 0;">📋 Template Information</h3>
+                <p style="margin: 5px 0;"><strong>Academic Year:</strong> ${academicYear || 'Not specified'}</p>
+                <p style="margin: 5px 0;"><strong>Branch:</strong> ${branch || 'Not specified'}</p>
+                <p style="margin: 5px 0;"><strong>Semester:</strong> ${semester || 'Not specified'}</p>
+            </div>
             
             <!-- Class Statistics -->
             <div style="margin: 20px 0; padding: 15px; background: #f0f8ff; border-radius: 8px;">
@@ -23,152 +31,6 @@ function renderComprehensiveAnalysis(data) {
                 <p><strong>Passed:</strong> <span style="color: green;">${classStats.passed}</span></p>
                 <p><strong>Failed:</strong> <span style="color: red;">${classStats.failed}</span></p>
                 <p><strong>Pass Percentage:</strong> ${classStats.passPercentage}%</p>
-            </div>
-
-            <!-- Subject-wise Statistics Table -->
-            <h3 style="color: #0078D7; margin-top: 30px;">📚 Subject-wise Indicators</h3>
-            <div style="overflow-x: auto; margin-bottom: 1rem;">
-                <table style="width: 100%; border-collapse: collapse; margin: 20px 0 1rem 0; font-size: 14px;">
-                    <thead>
-                        <!-- Course Code Row (Dark Background) -->
-                        <tr style="background: #2c3e50; color: white;">
-                            <th style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Indicators / Course Code</th>
-    `;
-
-    // Add course codes in the first row - one column per subject
-    subjectStats.forEach(stat => {
-        const courseCode = stat.courseCode || stat.subject;
-        html += `
-                            <th style="padding: 10px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${courseCode}</th>
-        `;
-    });
-
-    html += `
-                        </tr>
-                    </thead>
-                    <tbody>
-    `;
-
-    // Add subject stats rows - now we need to show data for each subject separately
-    // First, let's create rows for each indicator
-    const indicators = ['Appeared', 'Passed', 'Failed', 'Pass %', 'FCD', 'FC', 'SC', 'Max CIE', 'Min CIE', 'Avg CIE', 'Max SEE', 'Min SEE', 'Avg SEE'];
-    
-    indicators.forEach(indicator => {
-        html += `
-            <tr style="background: #f9f9f9;">
-                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${indicator}</td>
-        `;
-        
-        subjectStats.forEach(stat => {
-            let value = '';
-            switch(indicator) {
-                case 'Appeared': value = stat.appeared; break;
-                case 'Passed': value = `<span style="color: green;">${stat.passed}</span>`; break;
-                case 'Failed': value = `<span style="color: red;">${stat.failed}</span>`; break;
-                case 'Pass %': value = stat.passPercentage + '%'; break;
-                case 'FCD': value = stat.fcdCount; break;
-                case 'FC': value = stat.fcCount; break;
-                case 'SC': value = stat.scCount; break;
-                case 'Max CIE': value = stat.maxCIE; break;
-                case 'Min CIE': value = stat.minCIE; break;
-                case 'Avg CIE': value = stat.avgCIE; break;
-                case 'Max SEE': value = stat.maxSEE; break;
-                case 'Min SEE': value = stat.minSEE; break;
-                case 'Avg SEE': value = stat.avgSEE; break;
-            }
-            
-            html += `
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${value}</td>
-            `;
-        });
-        
-        html += `
-            </tr>
-        `;
-    });
-
-    html += `
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Student Results Table -->
-            <h3 style="color: #0078D7; margin-top: 1rem;">👨‍🎓 Student-wise Results</h3>
-            <div style="overflow-x: auto; margin-top: 1rem;">
-                <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 13px;">
-                    <thead>
-                        <tr style="background: #0078D7; color: white;">
-                            <th style="padding: 8px; border: 1px solid #ddd;">S.N.</th>
-                            <th style="padding: 8px; border: 1px solid #ddd;">USN</th>
-                            <th style="padding: 8px; border: 1px solid #ddd;">Name</th>
-                            <th style="padding: 8px; border: 1px solid #ddd;">% Marks</th>
-                            <th style="padding: 8px; border: 1px solid #ddd;">Result</th>
-                            <th style="padding: 8px; border: 1px solid #ddd;">Grade</th>
-    `;
-
-    // Add subject columns (CIE and SEE for each)
-    const courseCodes = data.courseCodes || subjectNames;
-    courseCodes.forEach((code, idx) => {
-        const displayText = code !== subjectNames[idx] ? `${code}<br/><small>${subjectNames[idx]}</small>` : code;
-        html += `
-                            <th colspan="2" style="padding: 8px; border: 1px solid #ddd; font-size: 12px;">${displayText}</th>
-        `;
-    });
-
-    html += `
-                        </tr>
-                        <tr style="background: #0078D7; color: white;">
-                            <th colspan="6"></th>
-    `;
-
-    // Add CIE/SEE headers
-    subjectNames.forEach(() => {
-        html += `
-                            <th style="padding: 4px; border: 1px solid #ddd; font-size: 11px;">CIE</th>
-                            <th style="padding: 4px; border: 1px solid #ddd; font-size: 11px;">SEE</th>
-        `;
-    });
-
-    html += `
-                        </tr>
-                    </thead>
-                    <tbody>
-    `;
-
-    // Add student rows
-    students.forEach((student, index) => {
-        const rowColor = student.result === 'PASS' ? '#d4edda' : '#f8d7da';
-        const resultColor = student.result === 'PASS' ? 'green' : 'red';
-        const serialNumber = student.sn || (index + 1); // Use index as fallback
-        
-        html += `
-            <tr style="background: ${rowColor};">
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${serialNumber}</td>
-                <td style="padding: 6px; border: 1px solid #ddd;">${student.usn}</td>
-                <td style="padding: 6px; border: 1px solid #ddd;">${student.name}</td>
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${student.percentage}</td>
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: ${resultColor}; font-weight: bold;">${student.result}</td>
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${student.grade}</td>
-        `;
-
-        // Add marks for each subject
-        student.subjects.forEach(subj => {
-            const cieColor = subj.cie < 20 ? 'red' : 'black';
-            const seeColor = subj.see < 18 ? 'red' : 'black';
-            html += `
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: ${cieColor};">${subj.cie}</td>
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: ${seeColor};">${subj.see}</td>
-            `;
-        });
-
-        html += `
-            </tr>
-        `;
-    });
-
-    html += `
-                    </tbody>
-                </table>
             </div>
 
             <!-- Graphical Representations -->
@@ -200,6 +62,165 @@ function renderComprehensiveAnalysis(data) {
                 </div>
             </div>
 
+            <!-- Subject-wise Statistics Table -->
+            <h3 style="color: #0078D7; margin-top: 30px;">📚 Subject-wise Indicators</h3>
+            <div style="overflow-x: auto; margin-bottom: 1rem;">
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0 1rem 0; font-size: 14px; border-radius: 8px; overflow: hidden; color: #000000; border: 2px solid #000000;">
+                    <thead>
+                        <!-- Course Code Row (Dark Background) -->
+                        <tr style="background: #2c3e50; color: #000000;">
+                            <th style="padding: 10px; border: 1px solid #000000; font-weight: bold; color: #000000; background: #e0e0e0;">Indicators / Course Code</th>
+    `;
+
+    // Add course codes in the first row - one column per subject
+    subjectStats.forEach(stat => {
+        const courseCode = stat.courseCode || stat.subject;
+        html += `
+                            <th style="padding: 10px; border: 1px solid #000000; text-align: center; font-weight: bold; color: #000000; background: #e0e0e0;">${courseCode}</th>
+        `;
+    });
+
+    html += `
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    // Add subject stats rows - now we need to show data for each subject separately
+    // First, let's create rows for each indicator
+    const indicators = ['Appeared', 'Passed', 'Failed', 'Pass %', 'FCD', 'FC', 'SC', 'Max CIE', 'Min CIE', 'Avg CIE', 'Max SEE', 'Min SEE', 'Avg SEE'];
+    
+    indicators.forEach(indicator => {
+        html += `
+            <tr style="background: #f9f9f9;">
+                <td style="padding: 8px; border: 1px solid #000000; font-weight: bold; color: #000000;">${indicator}</td>
+        `;
+        
+        subjectStats.forEach(stat => {
+            let value = '';
+            switch(indicator) {
+                case 'Appeared': value = stat.appeared || 0; break;
+                case 'Passed': value = `<span style="color: green;">${stat.passed || 0}</span>`; break;
+                case 'Failed': value = `<span style="color: red;">${stat.failed || 0}</span>`; break;
+                case 'Pass %': value = (stat.passPercent || 0) + '%'; break;
+                case 'FCD': value = stat.fcd || 0; break;
+                case 'FC': value = stat.fc || 0; break;
+                case 'SC': value = stat.sc || 0; break;
+                case 'Max CIE': value = stat.maxCIE || 0; break;
+                case 'Min CIE': value = stat.minCIE || 0; break;
+                case 'Avg CIE': value = stat.avgCIE || 0; break;
+                case 'Max SEE': value = stat.maxSEE || 0; break;
+                case 'Min SEE': value = stat.minSEE || 0; break;
+                case 'Avg SEE': value = stat.avgSEE || 0; break;
+            }
+            
+            html += `
+                <td style="padding: 8px; border: 1px solid #000000; text-align: center; color: #000000;">${value}</td>
+            `;
+        });
+        
+        html += `
+            </tr>
+        `;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Student Results Table -->
+            <h3 style="color: #0078D7; margin-top: 1rem;">👨‍🎓 Student-wise Results</h3>
+            <div style="overflow-x: auto; margin-top: 1rem;">
+                <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 13px; border-radius: 2px; overflow: hidden; color: #000000;">
+                    <thead>
+                        <tr style="background: #000000; color: black;">
+                            <th style="padding: 8px; border: 1px solid black;">S.N.</th>
+                            <th style="padding: 8px; border: 1px solid black;">USN</th>
+                            <th style="padding: 8px; border: 1px solid black;">Name</th>
+                            <th style="padding: 8px; border: 1px solid black;">% Marks</th>
+                            <th style="padding: 8px; border: 1px solid black;">Result</th>
+                            <th style="padding: 8px; border: 1px solid black;">Grade</th>
+    `;
+
+    // Add subject columns (CIE and SEE for each)
+    const courseCodes = data.courseCodes || subjectNames;
+    courseCodes.forEach((code, idx) => {
+        const displayText = code !== subjectNames[idx] ? `${code}<br/><small>${subjectNames[idx]}</small>` : code;
+        html += `
+                            <th colspan="2" style="padding: 8px; border: 1px solid black; font-size: 12px;">${displayText}</th>
+        `;
+    });
+
+    html += `
+                        </tr>
+                        <tr style="background: #f0f0f0; color: #000000;">
+                            <th colspan="6" style="background: #f0f0f0;"></th>
+    `;
+
+    // Add CIE/SEE headers
+    subjectNames.forEach(() => {
+        html += `
+                            <th style="padding: 4px; border: 1px solid black; font-size: 11px; font-weight: bold; color: #000000;">CIE</th>
+                            <th style="padding: 4px; border: 1px solid black; font-size: 11px; font-weight: bold; color: #000000;">SEE</th>
+        `;
+    });
+
+    html += `
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    // Add student rows
+    students.forEach((student, index) => {
+        // Determine row background color based on rank and result
+        let rowColor = 'white'; // Default
+        
+        if (student.result === 'FAIL') {
+            rowColor = '#ffcccc'; // Complete red for failed students
+        } else if (student.rank === 1) {
+            rowColor = '#FFD700'; // Gold for 1st
+        } else if (student.rank === 2) {
+            rowColor = '#C0C0C0'; // Silver for 2nd
+        } else if (student.rank === 3) {
+            rowColor = '#CD7F32'; // Bronze for 3rd
+        }
+        
+        const resultColor = student.result === 'PASS' ? 'green' : 'red';
+        const serialNumber = student.sn || (index + 1);
+        const rankLabel = student.rankLabel || serialNumber;
+        
+        html += `
+            <tr style="background: ${rowColor};">
+                <td style="padding: 6px; border: 1px solid black; text-align: center; font-weight: bold;">${rankLabel}</td>
+                <td style="padding: 6px; border: 1px solid black;">${student.usn}</td>
+                <td style="padding: 6px; border: 1px solid black; font-weight: ${student.rank <= 3 ? 'bold' : 'normal'};">${student.name}</td>
+                <td style="padding: 6px; border: 1px solid black; text-align: center;">${student.percentage}%</td>
+                <td style="padding: 6px; border: 1px solid black; text-align: center; color: ${resultColor}; font-weight: bold;">${student.result}</td>
+                <td style="padding: 6px; border: 1px solid black; text-align: center; font-weight: bold;">${student.grade}</td>
+        `;
+
+        // Add marks for each subject
+        student.subjects.forEach(subj => {
+            const cieColor = subj.cie < 20 ? 'red' : 'black';
+            const seeColor = subj.see < 18 ? 'red' : 'black';
+            html += `
+                <td style="padding: 6px; border: 1px solid black; text-align: center; color: ${cieColor};">${subj.cie}</td>
+                <td style="padding: 6px; border: 1px solid black; text-align: center; color: ${seeColor};">${subj.see}</td>
+            `;
+        });
+
+        html += `
+            </tr>
+        `;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+
             <!-- Legend -->
             <div style="margin-top: 1rem; padding: 15px; background: #f0f0f0; border-radius: 8px;">
                 <h4 style="color: #0078D7;">Legend:</h4>
@@ -227,16 +248,23 @@ function renderComprehensiveAnalysis(data) {
 function createCharts(data) {
     const { classStats, subjectStats, students } = data;
 
-    // 1. Pass/Fail Pie Chart
+    // 1. Pass/Fail Pie Chart with Top 3 Rankers
     const passFailCtx = document.getElementById('passFailChart');
     if (passFailCtx) {
+        // Count students by category
+        const firstRank = students.filter(s => s.rank === 1).length;
+        const secondRank = students.filter(s => s.rank === 2).length;
+        const thirdRank = students.filter(s => s.rank === 3).length;
+        const otherPassed = classStats.passed - firstRank - secondRank - thirdRank;
+        const failed = classStats.failed;
+
         new Chart(passFailCtx, {
             type: 'pie',
             data: {
-                labels: ['Passed', 'Failed'],
+                labels: ['🥇 1st Rank', '🥈 2nd Rank', '🥉 3rd Rank', 'Other Passed', 'Failed'],
                 datasets: [{
-                    data: [classStats.passed, classStats.failed],
-                    backgroundColor: ['#28a745', '#dc3545'],
+                    data: [firstRank, secondRank, thirdRank, otherPassed, failed],
+                    backgroundColor: ['#FFD700', '#C0C0C0', '#CD7F32', '#28a745', '#dc3545'],
                     borderWidth: 2,
                     borderColor: '#fff'
                 }]
@@ -248,8 +276,8 @@ function createCharts(data) {
                     legend: {
                         position: 'bottom',
                         labels: {
-                            font: { size: 14 },
-                            padding: 15
+                            font: { size: 13 },
+                            padding: 12
                         }
                     },
                     tooltip: {
@@ -268,6 +296,7 @@ function createCharts(data) {
         });
     }
 
+    // 2. Grade Distribution Bar Chart
     // 2. Grade Distribution Bar Chart
     const gradeCtx = document.getElementById('gradeChart');
     if (gradeCtx) {

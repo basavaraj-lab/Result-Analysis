@@ -7,11 +7,39 @@ console.log('✅ Application initialized - No Firebase required');
 document.addEventListener('DOMContentLoaded', function () {
   console.log('🚀 DOM Content Loaded - Initializing...');
   
+  // Check if we're in edit mode
+  checkEditMode();
+  
   initializeCourseManagement();
   initializeStudentManagement();
   
   console.log('✅ All modules initialized');
 });
+
+// ==================== CHECK EDIT MODE ====================
+function checkEditMode() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isEditMode = urlParams.get('mode') === 'edit';
+  
+  if (isEditMode) {
+    const editingTemplateData = sessionStorage.getItem('editingTemplateData');
+    if (editingTemplateData) {
+      const template = JSON.parse(editingTemplateData);
+      console.log('✏️ Edit mode activated for template:', template.fileName);
+      
+      // Pre-fill the form fields
+      document.getElementById('academicYear').value = template.academicYear || '';
+      document.getElementById('branch').value = template.branch || '';
+      document.getElementById('semester').value = template.semester || '';
+      
+      // Change page title or add indicator
+      const pageTitle = document.querySelector('h1, h2');
+      if (pageTitle) {
+        pageTitle.textContent = 'Edit Template: ' + template.fileName;
+      }
+    }
+  }
+}
 
 // ==================== COURSE MANAGEMENT ====================
 function initializeCourseManagement() {
@@ -53,8 +81,8 @@ function initializeCourseManagement() {
       const c10 = row.insertCell(); c10.innerHTML = `<input type="number" id="totalMin${count}" name="totalMin${count}" placeholder="Enter Total MIN (Pass)" class="total-min" autocomplete="off">`;
       const c11 = row.insertCell();
       c11.innerHTML = `
-        <button type="button" class="save-course-btn" style="background: #28a745; color: white; padding: 5px 10px; margin-right: 5px; border: none; border-radius: 4px; cursor: pointer;">💾 Save</button>
-        <button type="button" class="delete-btn" style="background: #dc3545; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer;">🗑️ Delete</button>
+        <button type="button" class="save-course-btn" style=" width:120px; background: #28a745; color: white; padding: 5px 10px; margin-right: 0px; border: none; border-radius: 4px; cursor: pointer;">SAVE</button>
+        <button type="button" class="delete-btn" style=" width:120px; background: #dc3545; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer;">DELETE</button>
       `;
 
     // Mark course as saved (local only)
@@ -110,84 +138,48 @@ function initializeStudentManagement() {
   const saveBtn = document.getElementById('saveTemplateBtn') || document.querySelector('.saveTemplate button');
   const tableEl = document.querySelector('.addStudentTable table');
 
-  if (!tableEl || !addBtn || !saveBtn) {
-    console.warn('⚠️ Student table elements not found');
+  if (!saveBtn) {
+    console.warn('⚠️ Save button not found');
     return;
   }
 
-  const tableBody = tableEl.tBodies[0] || tableEl.createTBody();
-  let count = tableBody.rows.length;
+  const tableBody = tableEl?.tBodies?.[0] || tableEl?.createTBody();
+  let count = tableBody?.rows?.length || 0;
 
   console.log('👨‍🎓 Initializing Student Management...');
 
-  addBtn.addEventListener('click', function() {
-    console.log('➕ Adding new student row');
-    const row = tableBody.insertRow();
-    count++;
+  // Add Student button is now optional (hidden by default)
+  if (addBtn) {
+    addBtn.addEventListener('click', function() {
+      console.log('➕ Adding new student row');
+      const row = tableBody.insertRow();
+      count++;
 
-    const c0 = row.insertCell(); c0.textContent = count;
-    const c1 = row.insertCell(); c1.innerHTML = `<input type="text" id="studentUSN${count}" name="studentUSN${count}" placeholder="Enter your USN" class="student-usn" style="width: 92%;" autocomplete="off">`;
-    const c2 = row.insertCell(); c2.innerHTML = `<input type="text" id="studentName${count}" name="studentName${count}" placeholder="Enter Student Name" class="student-name" style="width: 95%;" autocomplete="off">`;
-    const c3 = row.insertCell(); 
-    c3.innerHTML = `
-      <button type="button" class="save-student-btn" style="background: #28a745; color: white; padding: 5px 8px; margin-right: 5px; border: none; border-radius: 4px; cursor: pointer;">💾</button>
-      <button type="button" class="delete-btn" style="background: #dc3545; color: white; padding: 5px 8px; border: none; border-radius: 4px; cursor: pointer;">🗑️</button>
-    `;
+      const c0 = row.insertCell(); c0.textContent = count;
+      const c1 = row.insertCell(); c1.innerHTML = `<input type="text" id="studentUSN${count}" name="studentUSN${count}" placeholder="Enter your USN" class="student-usn" style="width: 92%;" autocomplete="off">`;
+      const c2 = row.insertCell(); c2.innerHTML = `<input type="text" id="studentName${count}" name="studentName${count}" placeholder="Enter Student Name" class="student-name" style="width: 95%;" autocomplete="off">`;
+      const c3 = row.insertCell(); 
+      c3.innerHTML = `
+        <button type="button" class="delete-btn" style="background: #dc3545; color: white; padding: 5px 8px; border: none; border-radius: 4px; cursor: pointer;">delete</button>
+      `;
 
-    // Mark student as saved (local only)
-    c3.querySelector('.save-student-btn').addEventListener('click', function() {
-      console.log('💾 Saving student locally...');
-      
-      const studentData = {
-        usn: row.querySelector('.student-usn').value.trim(),
-        name: row.querySelector('.student-name').value.trim()
-      };
-
-      console.log('📝 Student Data:', studentData);
-
-      if (!studentData.usn || !studentData.name) {
-        alert('❌ Please fill USN and Name');
-        return;
-      }
-
-      // Mark as saved
-      alert('✅ Student saved locally!');
-      this.textContent = '✓';
-      this.disabled = true;
-      this.style.background = '#6c757d';
-      row.querySelector('.student-usn').readOnly = true;
-      row.querySelector('.student-name').readOnly = true;
-      row.style.background = '#e8f5e9';
+      c3.querySelector('.delete-btn').addEventListener('click', function() {
+        row.remove();
+        refreshSerials();
+      });
     });
-
-    c3.querySelector('.delete-btn').addEventListener('click', function() {
-      row.remove();
-      refreshSerials();
-    });
-  });
-
-  function refreshSerials() {
-    Array.from(tableBody.rows).forEach((r, idx) => {
-      if (r.cells && r.cells[0]) r.cells[0].textContent = idx + 1;
-    });
-    count = tableBody.rows.length;
   }
 
-  // Attach delete handlers for existing buttons
-  Array.from(tableBody.rows).forEach(r => {
-      const del = r.querySelector('.delete-btn') || r.querySelector('#actiondeletebtn2');
-      if (del && !del.dataset.bound) {
-        del.addEventListener('click', function() { 
-          if (confirm('Delete this student?')) {
-            r.remove(); 
-            refreshSerials(); 
-          }
-        });
-        del.dataset.bound = '1';
-      }
-    });
+  function refreshSerials() {
+    if (tableBody && tableBody.rows) {
+      Array.from(tableBody.rows).forEach((r, idx) => {
+        if (r.cells && r.cells[0]) r.cells[0].textContent = idx + 1;
+      });
+      count = tableBody.rows.length;
+    }
+  }
 
-  // ==================== SAVE TEMPLATE TO FIREBASE (EXCEL + DATABASE) ====================
+  // ==================== SAVE TEMPLATE (CREATES EXCEL WITH EMPTY ROWS) ====================
   saveBtn.addEventListener('click', async function(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -197,25 +189,34 @@ function initializeStudentManagement() {
     const academicYear = document.getElementById('academicYear')?.value.trim() || '';
     const branch = document.getElementById('branch')?.value.trim() || '';
     const semester = document.getElementById('semester')?.value || '';
+    const totalStudentsInput = document.getElementById('totalStudents')?.value || '';
 
-    console.log('📋 Form Values:', { academicYear, branch, semester });
+    console.log('📋 Form Values:', { academicYear, branch, semester, totalStudentsInput });
 
     if (!academicYear || !branch || !semester) {
       alert(`❌ Please fill all required fields:\n\n- Academic Year: ${academicYear || 'MISSING'}\n- Branch: ${branch || 'MISSING'}\n- Semester: ${semester || 'MISSING'}`);
       return;
     }
 
-    // Collect students
-    const students = [];
-    Array.from(tableBody.rows).forEach(r => {
-      const inputs = r.querySelectorAll('input');
-      const cells = r.querySelectorAll('td');
-      const usn = inputs[0]?.value.trim() || cells[1]?.textContent.trim() || '';
-      const name = inputs[1]?.value.trim() || cells[2]?.textContent.trim() || '';
-      if (usn && name) students.push({ usn, name });
-    });
+    if (!totalStudentsInput || parseInt(totalStudentsInput) <= 0) {
+      alert('❌ Please enter the total number of students (must be greater than 0)');
+      return;
+    }
 
-    console.log('👨‍🎓 Collected students:', students.length);
+    // Create empty student rows based on total students input
+    const studentCount = parseInt(totalStudentsInput);
+    const students = [];
+    
+    console.log(`📊 Creating ${studentCount} empty student rows`);
+    
+    for (let i = 1; i <= studentCount; i++) {
+      students.push({ 
+        usn: '', 
+        name: '' 
+      });
+    }
+
+    console.log('👨‍🎓 Total students to include:', students.length);
 
     // Collect courses
     const courseTableBody = document.querySelector('.addCourseTable table tbody');
@@ -361,7 +362,65 @@ function initializeStudentManagement() {
       
       console.log('✅ Excel file downloaded!');
       
-      alert(`✅ Template created successfully!\n\n📁 File: ${excelFileName}\n👨‍🎓 Students: ${students.length}\n📚 Courses: ${courses.length}\n\n✓ Excel file downloaded to your computer`);
+      // ==================== SAVE TO LOCALSTORAGE FOR DOWNLOAD TEMPLATE PAGE ====================
+      try {
+        // Check if we're in edit mode
+        const editingTemplateId = sessionStorage.getItem('editingTemplateId');
+        let savedTemplates = JSON.parse(localStorage.getItem('examTemplates') || '[]');
+        
+        if (editingTemplateId) {
+          // Edit mode - update existing template
+          const templateIndex = savedTemplates.findIndex(t => t.id === parseInt(editingTemplateId));
+          
+          if (templateIndex !== -1) {
+            // Update existing template
+            savedTemplates[templateIndex] = {
+              ...savedTemplates[templateIndex],
+              fileName: excelFileName,
+              academicYear: academicYear,
+              branch: branch,
+              semester: semester,
+              studentCount: students.length,
+              courseCount: courses.length,
+              createdDate: new Date().toLocaleDateString('en-IN'),
+              createdTime: new Date().toLocaleTimeString('en-IN'),
+              blobData: Array.from(new Uint8Array(excelBuffer))
+            };
+            
+            console.log('✅ Template updated in localStorage!');
+            
+            // Clear edit mode data
+            sessionStorage.removeItem('editingTemplateId');
+            sessionStorage.removeItem('editingTemplateData');
+          }
+        } else {
+          // Create mode - add new template
+          const templateInfo = {
+            id: Date.now(),
+            fileName: excelFileName,
+            academicYear: academicYear,
+            branch: branch,
+            semester: semester,
+            studentCount: students.length,
+            courseCount: courses.length,
+            createdDate: new Date().toLocaleDateString('en-IN'),
+            createdTime: new Date().toLocaleTimeString('en-IN'),
+            blobData: Array.from(new Uint8Array(excelBuffer))
+          };
+          
+          savedTemplates.push(templateInfo);
+          console.log('✅ New template added to localStorage!');
+        }
+        
+        // Save to localStorage
+        localStorage.setItem('examTemplates', JSON.stringify(savedTemplates));
+        console.log('✅ Template saved to Download Template page!');
+      } catch (storageError) {
+        console.warn('⚠️ Could not save to Download Template page:', storageError);
+      }
+      
+      const editMode = sessionStorage.getItem('editingTemplateId') ? 'updated' : 'created';
+      alert(`✅ Template ${editMode} successfully!\n\n📁 File: ${excelFileName}\n👨‍🎓 Students: ${students.length}\n📚 Courses: ${courses.length}\n\n✓ Excel file downloaded to your computer\n✓ Template saved to Download Template page`);
         
     } catch (error) {
       console.error('❌ Error creating template:', error);
