@@ -119,7 +119,7 @@ function analyzeData() {
                 }
                 const data = await resp.json();
                 hideLoadingIndicator();
-                console.log('✅ Analysis response received:', data);
+                console.log('Analysis response received:', data);
                 
                 // Ensure data is valid before rendering
                 if (data && data.success) {
@@ -336,7 +336,7 @@ function renderAnalysisFromServer(data) {
     const summaryHTML = `
         <div class="analysis-results" style="margin-top: 20px; padding: 20px;">
             <div class="summary-section" style="margin-bottom: 30px;">
-                <h3 style="color: #0078D7; margin-bottom: 15px;">📊 Result Summary</h3>
+                <h3 style="color: #0078D7; margin-bottom: 15px;">Result Summary</h3>
                 <div class="summary-cards" style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
                     <div class="card" style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; min-width: 150px;">
                         <h4 style="margin: 0; color: #666;">Average Marks</h4>
@@ -358,7 +358,7 @@ function renderAnalysisFromServer(data) {
             </div>
 
             <div class="table-section" style="margin-bottom: 30px;">
-                <h3 style="color: #0078D7; margin-bottom: 15px;">📚 Subject-wise Analysis</h3>
+                <h3 style="color: #0078D7; margin-bottom: 15px;">Subject-wise Analysis</h3>
                 <table id="resultTable" style="width: 100%; border-collapse: collapse; margin: 0 auto;">
                     <thead>
                         <tr style="background: #0078D7; color: white;">
@@ -373,12 +373,12 @@ function renderAnalysisFromServer(data) {
             </div>
 
             <div class="chart-section" style="margin-bottom: 30px;">
-                <h3 style="color: #0078D7; margin-bottom: 15px;">📈 Performance Chart</h3>
+                <h3 style="color: #0078D7; margin-bottom: 15px;">Performance Chart</h3>
                 <canvas id="resultChart" style="max-width: 100%; height: 400px;"></canvas>
             </div>
             
             ${downloadUrl ? `<div class="download-section" style="text-align: center; margin-top: 20px;">
-                <h3 style="color: #0078D7; margin-bottom: 15px;">📥 Download Results</h3>
+                <h3 style="color: #0078D7; margin-bottom: 15px;">Download Results</h3>
                 <a href="${downloadUrl}" download style="display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">Download Excel with Analysis</a>
             </div>` : ''}
         </div>
@@ -627,12 +627,12 @@ function saveAnalysisToExcel() {
         // Display the saved results list
         displaySavedResultsList();
         
-        console.log('✅ Analysis saved to result analysis page');
+        console.log('Analysis saved to result analysis page');
         
         // Show success message
         const successMsg = document.createElement('div');
         successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10000; font-weight: bold;';
-        successMsg.innerHTML = `✅ Student-wise results saved successfully!`;
+        successMsg.innerHTML = `Student-wise results saved successfully!`;
         document.body.appendChild(successMsg);
         
         setTimeout(() => {
@@ -830,7 +830,7 @@ function downloadSavedResult(id) {
         const filename = `Analysis_${academicYear}_${branch}_Sem${semester}_${id}.xlsx`;
         XLSX.writeFile(wb, filename);
         
-        console.log('✅ Downloaded:', filename);
+        console.log('Downloaded:', filename);
     } catch (error) {
         console.error('Error downloading result:', error);
         alert('Error downloading: ' + error.message);
@@ -864,7 +864,7 @@ function deleteSavedResult(id) {
         studentSection.remove();
     }
     
-    console.log('✅ Deleted result:', id);
+    console.log('Deleted result:', id);
 }
 
 // ============================
@@ -888,34 +888,34 @@ function displayStudentWiseResults(students, courseTypes) {
     let html = `
         <div id="studentWiseSection" style="margin-top: 40px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="color: #0078D7; margin: 0;">📋 Student-wise Results</h3>
+                <h3 style="color: #0078D7; margin: 0;">Student-wise Results</h3>
                 <button onclick="closeStudentResults()" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                     CLOSE
                 </button>
             </div>
             <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid black;">
                     <thead>
-                        <tr style="background: #0078D7; color: white;">
-                            <th rowspan="2" style="padding: 10px; border: 1px solid #ddd; text-align: center;">S.N.</th>
-                            <th rowspan="2" style="padding: 10px; border: 1px solid #ddd; text-align: center;">USN</th>
-                            <th rowspan="2" style="padding: 10px; border: 1px solid #ddd; text-align: center;">Name</th>`;
+                        <tr style="background: #f0f0f0; color: black; border: 1px solid black;">
+                            <th rowspan="2" style="padding: 10px; border: 1px solid black; text-align: center; font-weight: bold;">S.N.</th>
+                            <th rowspan="2" style="padding: 10px; border: 1px solid black; text-align: center; font-weight: bold;">USN</th>
+                            <th rowspan="2" style="padding: 10px; border: 1px solid black; text-align: center; font-weight: bold;">Name</th>`;
     
     // Add subject headers
     if (students[0].subjects) {
         students[0].subjects.forEach((subj, idx) => {
             const courseType = courseTypes?.[idx] || {};
             const colspan = courseType.isProject ? 2 : 3;
-            html += `<th colspan="${colspan}" style="padding: 10px; border: 1px solid #ddd; text-align: center;">${subj.name}</th>`;
+            html += `<th colspan="${colspan}" style="padding: 10px; border: 1px solid black; text-align: center; font-weight: bold;">${subj.name}</th>`;
         });
     }
     
     html += `
-                            <th rowspan="2" style="padding: 10px; border: 1px solid #ddd; text-align: center;">% Marks</th>
-                            <th rowspan="2" style="padding: 10px; border: 1px solid #ddd; text-align: center;">Result</th>
-                            <th rowspan="2" style="padding: 10px; border: 1px solid #ddd; text-align: center;">Grade</th>
+                            <th rowspan="2" style="padding: 10px; border: 1px solid black; text-align: center; font-weight: bold;">% Marks</th>
+                            <th rowspan="2" style="padding: 10px; border: 1px solid black; text-align: center; font-weight: bold;">Result</th>
+                            <th rowspan="2" style="padding: 10px; border: 1px solid black; text-align: center; font-weight: bold;">Grade</th>
                         </tr>
-                        <tr style="background: #0078D7; color: white;">`;
+                        <tr style="background: #f0f0f0; color: black; border: 1px solid black;">`;
     
     // Add CIE/SEE/Total subheaders
     if (students[0].subjects) {
@@ -923,13 +923,13 @@ function displayStudentWiseResults(students, courseTypes) {
             const courseType = courseTypes?.[idx] || {};
             if (courseType.isProject) {
                 html += `
-                    <th style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 12px;">SEE</th>
-                    <th style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 12px;">Total</th>`;
+                    <th style="padding: 8px; border: 1px solid black; text-align: center; font-size: 12px; font-weight: bold;">SEE</th>
+                    <th style="padding: 8px; border: 1px solid black; text-align: center; font-size: 12px; font-weight: bold;">Total</th>`;
             } else {
                 html += `
-                    <th style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 12px;">CIE</th>
-                    <th style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 12px;">SEE</th>
-                    <th style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 12px;">Total</th>`;
+                    <th style="padding: 8px; border: 1px solid black; text-align: center; font-size: 12px; font-weight: bold;">CIE</th>
+                    <th style="padding: 8px; border: 1px solid black; text-align: center; font-size: 12px; font-weight: bold;">SEE</th>
+                    <th style="padding: 8px; border: 1px solid black; text-align: center; font-size: 12px; font-weight: bold;">Total</th>`;
             }
         });
     }
@@ -950,9 +950,9 @@ function displayStudentWiseResults(students, courseTypes) {
         
         html += `
             <tr style="background: ${rowColor};">
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${index + 1}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${student.usn}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: left;">${student.name}</td>`;
+                <td style="padding: 8px; border: 1px solid black; text-align: center;">${index + 1}</td>
+                <td style="padding: 8px; border: 1px solid black; text-align: center;">${student.usn}</td>
+                <td style="padding: 8px; border: 1px solid black; text-align: left;">${student.name}</td>`;
         
         // Add subject marks
         student.subjects.forEach((subj, idx) => {
@@ -960,23 +960,23 @@ function displayStudentWiseResults(students, courseTypes) {
             if (courseType.isProject) {
                 const seeColor = (subj.see || 0) < 40 ? 'red' : 'black';
                 html += `
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: ${seeColor};">${subj.see || 0}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${subj.total || 0}</td>`;
+                    <td style="padding: 8px; border: 1px solid black; text-align: center; color: ${seeColor};">${subj.see || 0}</td>
+                    <td style="padding: 8px; border: 1px solid black; text-align: center;">${subj.total || 0}</td>`;
             } else {
                 const cieColor = (subj.cie || 0) < 20 ? 'red' : 'black';
                 const seeColor = (subj.see || 0) < 20 ? 'red' : 'black';
                 html += `
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: ${cieColor};">${subj.cie || 0}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: ${seeColor};">${subj.see || 0}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${subj.total || 0}</td>`;
+                    <td style="padding: 8px; border: 1px solid black; text-align: center; color: ${cieColor};">${subj.cie || 0}</td>
+                    <td style="padding: 8px; border: 1px solid black; text-align: center; color: ${seeColor};">${subj.see || 0}</td>
+                    <td style="padding: 8px; border: 1px solid black; text-align: center;">${subj.total || 0}</td>`;
             }
         });
         
         const resultColor = student.result === 'FAIL' ? 'red' : 'green';
         html += `
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${student.percentage}%</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: ${resultColor};">${student.result}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${student.grade}</td>
+                <td style="padding: 8px; border: 1px solid black; text-align: center; font-weight: bold;">${student.percentage}%</td>
+                <td style="padding: 8px; border: 1px solid black; text-align: center; font-weight: bold; color: ${resultColor};">${student.result}</td>
+                <td style="padding: 8px; border: 1px solid black; text-align: center; font-weight: bold;">${student.grade}</td>
             </tr>`;
     });
     

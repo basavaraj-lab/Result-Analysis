@@ -6,6 +6,7 @@
     <title>Download Template</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="style2.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body {
             margin: 0;
@@ -315,44 +316,54 @@
                 return;
             }
             
-            const templates = JSON.parse(localStorage.getItem('excelTemplates') || '[]');
+            const templates = JSON.parse(localStorage.getItem('examTemplates') || '[]');
             
-            // Separate matching and non-matching templates
-            const matchingTemplates = [];
-            const nonMatchingTemplates = [];
+            if (templates.length === 0) {
+                alert('❌ No templates available!\n\nPlease create or download a template first.');
+                return;
+            }
             
-            templates.forEach(template => {
-                const searchText = `${template.academicYear} ${template.branch} ${template.semester}`.toLowerCase();
-                if (searchText.includes(searchInput)) {
-                    matchingTemplates.push(template);
-                } else {
-                    nonMatchingTemplates.push(template);
-                }
+            // Filter matching templates
+            const matchingTemplates = templates.filter(template => {
+                const searchText = `${template.academicYear} ${template.branch} ${template.semester} ${template.fileName}`.toLowerCase();
+                return searchText.includes(searchInput);
             });
             
-            // Display matching templates first with green background
-            displayTemplates(matchingTemplates, nonMatchingTemplates);
+            // Show notification if no matches found
+            if (matchingTemplates.length === 0) {
+                alert('❌ Template not found!\n\nNo templates match your search criteria.');
+                loadTemplates(); // Show all templates
+                return;
+            }
+            
+            // Get non-matching templates
+            const nonMatchingTemplates = templates.filter(t => 
+                !matchingTemplates.some(mt => mt.id === t.id)
+            );
+            
+            // Display with blue highlighting
+            displaySearchResults(matchingTemplates, nonMatchingTemplates);
         }
         
-        // Display templates with matching ones highlighted
-        function displayTemplates(matchingTemplates, nonMatchingTemplates) {
+        // Display search results with matching ones highlighted in blue
+        function displaySearchResults(matchingTemplates, nonMatchingTemplates) {
             const tbody = document.getElementById('templateTableBody');
             tbody.innerHTML = '';
             
-            let serialNumber = 1;
+            let rowNumber = 1;
             
-            // Display matching templates with green background
+            // Display matching templates with blue background
             matchingTemplates.forEach(template => {
                 const row = document.createElement('tr');
-                row.style.backgroundColor = '#90EE90'; // Light green
+                row.style.backgroundColor = '#ADD8E6'; // Light blue
                 
                 row.innerHTML = `
-                    <td style="text-align: center;">${serialNumber++}</td>
+                    <td>${rowNumber++}</td>
                     <td>
-                        <strong>${template.name}</strong><br>
-                        <small style="color: #555;">
+                        <strong>${template.fileName}</strong><br>
+                        <small style="color: #333;">
                             ${template.academicYear} | ${template.branch} | Sem ${template.semester}<br>
-                            Created: ${template.createdAt}
+                            Created: ${template.createdDate} ${template.createdTime}
                         </small>
                     </td>
                     <td>
@@ -374,17 +385,17 @@
                 tbody.appendChild(row);
             });
             
-            // Display non-matching templates normally
+            // Display non-matching templates normally (below the blue ones)
             nonMatchingTemplates.forEach(template => {
                 const row = document.createElement('tr');
                 
                 row.innerHTML = `
-                    <td style="text-align: center;">${serialNumber++}</td>
+                    <td>${rowNumber++}</td>
                     <td>
-                        <strong>${template.name}</strong><br>
-                        <small style="color: #555;">
+                        <strong>${template.fileName}</strong><br>
+                        <small style="color: #333;">
                             ${template.academicYear} | ${template.branch} | Sem ${template.semester}<br>
-                            Created: ${template.createdAt}
+                            Created: ${template.createdDate} ${template.createdTime}
                         </small>
                     </td>
                     <td>
@@ -405,10 +416,6 @@
                 `;
                 tbody.appendChild(row);
             });
-            
-            if (matchingTemplates.length === 0 && nonMatchingTemplates.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">No templates found</td></tr>';
-            }
         }
         
         // Clear search and show all templates
@@ -616,8 +623,8 @@
     <span class="copy">Copyright ©️ 2025.All rights reserved. Developed by under Skill Lab @E&C, KVGCE</span>
     <br>
     <span class="dpdBy"> Developed By: 
-      <a href="https://www.linkedin.com/in/basavaraju-r-k-055843300?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" style="color: #0077b5; text-decoration: none;">Basavaraju R K</a>, 
-      <a href="https://www.linkedin.com/in/suhan-cs-2bb003301?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" target="_blank" style="color: #0077b5; text-decoration: none;">Suhan C S</a>
+      <a href="https://www.linkedin.com/in/basavaraju-r-k-055843300?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" style="color: #0077b5; text-decoration: none;"><i class="fa-brands fa-linkedin"></i>Basavaraju R K</a>, 
+      <a href="https://www.linkedin.com/in/suhan-cs-2bb003301?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app" target="_blank" style="color: #0077b5; text-decoration: none;"><i class="fa-brands fa-linkedin"></i>Suhan C S</a>
   </footer>
 </body>
 </html>

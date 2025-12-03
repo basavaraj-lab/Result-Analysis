@@ -197,26 +197,30 @@ function renderComprehensiveAnalysis(data) {
         // Determine row background color based on rank and result
         let rowColor = 'white'; // Default
         
-        // Rank colors take priority for top 3
-        if (student.rank === 1) {
-            rowColor = '#FFD700'; // Gold for 1st
-        } else if (student.rank === 2) {
-            rowColor = '#C0C0C0'; // Silver for 2nd
-        } else if (student.rank === 3) {
-            rowColor = '#8B4513'; // Brown for 3rd (changed from bronze)
+        // Only assign rank colors if student PASSED
+        if (student.result === 'PASS') {
+            if (student.rank === 1) {
+                rowColor = '#FFD700'; // Gold for 1st
+            } else if (student.rank === 2) {
+                rowColor = '#C0C0C0'; // Silver for 2nd
+            } else if (student.rank === 3) {
+                rowColor = '#8B4513'; // Brown for 3rd (changed from bronze)
+            }
         } else if (student.result === 'FAIL') {
-            rowColor = '#ffcccc'; // Light red for failed students (only if not in top 3)
+            rowColor = '#ffcccc'; // Light red for all failed students
         }
         
         const resultColor = student.result === 'PASS' ? 'green' : 'red';
-        const serialNumber = student.sn || (index + 1);
-        const rankLabel = student.rankLabel || serialNumber;
+        const serialNumber = index + 1; // Continuous serial number for all students
+        const rankLabel = student.rankLabel || '-'; // Rank label (🥇 1st, 🥈 2nd, 🥉 3rd, or -)
         
         html += `
             <tr style="background: ${rowColor};">
-                <td style="padding: 6px; border: 1px solid black; text-align: center; font-weight: bold;">${rankLabel}</td>
+                <td style="padding: 6px; border: 1px solid black; text-align: center; font-weight: bold;">${serialNumber}</td>
                 <td style="padding: 6px; border: 1px solid black;">${student.usn}</td>
-                <td style="padding: 6px; border: 1px solid black; font-weight: ${student.rank <= 3 ? 'bold' : 'normal'};">${student.name}</td>
+                <td style="padding: 6px; border: 1px solid black; font-weight: ${student.rank <= 3 && student.result === 'PASS' ? 'bold' : 'normal'};">
+                    ${student.rank <= 3 && student.result === 'PASS' ? rankLabel + ' ' : ''}${student.name}
+                </td>
                 <td style="padding: 6px; border: 1px solid black; text-align: center;">${student.percentage}%</td>
                 <td style="padding: 6px; border: 1px solid black; text-align: center; color: ${resultColor}; font-weight: bold;">${student.result}</td>
                 <td style="padding: 6px; border: 1px solid black; text-align: center; font-weight: bold;">${student.grade}</td>
@@ -336,23 +340,27 @@ function createCharts(data) {
             FCD: 0,
             FC: 0,
             SC: 0,
-            FAIL: 0
+            P: 0,
+            F: 0
         };
 
         students.forEach(student => {
-            if (gradeCounts.hasOwnProperty(student.grade)) {
-                gradeCounts[student.grade]++;
-            }
+            // Count all grades including F (fail)
+            if (student.grade === 'FCD') gradeCounts.FCD++;
+            else if (student.grade === 'FC') gradeCounts.FC++;
+            else if (student.grade === 'SC') gradeCounts.SC++;
+            else if (student.grade === 'P') gradeCounts.P++;
+            else if (student.grade === 'F' || student.result === 'FAIL') gradeCounts.F++;
         });
 
         new Chart(gradeCtx, {
             type: 'bar',
             data: {
-                labels: ['FCD (≥70%)', 'FC (60-69%)', 'SC (50-59%)', 'FAIL (<50%)'],
+                labels: ['FCD (≥70%)', 'FC (60-69%)', 'SC (50-59%)', 'P (40-49%)', 'F (Fail)'],
                 datasets: [{
                     label: 'Number of Students',
-                    data: [gradeCounts.FCD, gradeCounts.FC, gradeCounts.SC, gradeCounts.FAIL],
-                    backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545'],
+                    data: [gradeCounts.FCD, gradeCounts.FC, gradeCounts.SC, gradeCounts.P, gradeCounts.F],
+                    backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#fd7e14', '#dc3545'],
                     borderWidth: 1,
                     borderColor: '#333'
                 }]
