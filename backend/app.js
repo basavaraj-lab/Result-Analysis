@@ -226,10 +226,12 @@ function analyzeExcelFile(fileBuffer) {
   courseCodes.forEach((courseCode, subjectIndex) => {
     const courseType = courseTypes[courseCode] || '';
     const isProject = courseType === 'Project';
+    const isNCMC = courseType === 'NCMC Report';
     
     console.log(`\n📚 Processing Course ${subjectIndex + 1}/${courseCodes.length}: ${courseCode}`);
     console.log(`   Type: ${courseType || 'Not specified'}`);
     console.log(`   Is Project: ${isProject}`);
+    console.log(`   Is NCMC Report: ${isNCMC}`);
     console.log(`   Looking for columns starting at index: ${headerIndex}`);
     
     // Look at the actual header row to determine column structure
@@ -240,7 +242,7 @@ function analyzeExcelFile(fileBuffer) {
     console.log(`   Header at ${headerIndex}: "${headers[headerIndex]}"`);
     console.log(`   Header at ${headerIndex + 1}: "${headers[headerIndex + 1]}"`);
     
-    if (isProject || nextHeader === 'see') {
+    if (isProject || isNCMC || nextHeader === 'see') {
       // Project course or SEE-only course - only one column
       console.log(`   ✅ Project/SEE-only course - SEE at column ${headerIndex}`);
       subjectPairs.push({
@@ -248,7 +250,9 @@ function analyzeExcelFile(fileBuffer) {
         courseName: courseCode,
         cieColumnIndex: null,
         seeColumnIndex: headerIndex,
-        isProject: true
+        isProject: true,
+        isNCMC: isNCMC,
+        excludeFromPercentage: isNCMC // NCMC Report is shown but excluded from percentage
       });
       headerIndex += 1; // Move to next column
     } else if (nextHeader === 'cie' && nextNextHeader === 'see') {
@@ -259,7 +263,9 @@ function analyzeExcelFile(fileBuffer) {
         courseName: courseCode,
         cieColumnIndex: headerIndex,
         seeColumnIndex: headerIndex + 1,
-        isProject: false
+        isProject: false,
+        isNCMC: false,
+        excludeFromPercentage: false
       });
       headerIndex += 2; // Move past both columns
     } else {
@@ -270,7 +276,9 @@ function analyzeExcelFile(fileBuffer) {
         courseName: courseCode,
         cieColumnIndex: headerIndex,
         seeColumnIndex: headerIndex + 1,
-        isProject: false
+        isProject: false,
+        isNCMC: false,
+        excludeFromPercentage: false
       });
       headerIndex += 2;
     }
@@ -283,7 +291,8 @@ function analyzeExcelFile(fileBuffer) {
   // Log subject pair details
   subjectPairs.forEach((sp, idx) => {
     if (sp.isProject) {
-      console.log(`📖 ${idx + 1}. ${sp.courseCode} (Project) - SEE column: ${sp.seeColumnIndex}, Header: "${headers[sp.seeColumnIndex]}"`);
+      const courseLabel = sp.isNCMC ? 'NCMC Report' : 'Project';
+      console.log(`📖 ${idx + 1}. ${sp.courseCode} (${courseLabel}) - SEE column: ${sp.seeColumnIndex}, Header: "${headers[sp.seeColumnIndex]}"`);
     } else {
       console.log(`📖 ${idx + 1}. ${sp.courseCode} - CIE column: ${sp.cieColumnIndex} ("${headers[sp.cieColumnIndex]}"), SEE column: ${sp.seeColumnIndex} ("${headers[sp.seeColumnIndex]}")`);
     }
@@ -299,16 +308,17 @@ function analyzeExcelFile(fileBuffer) {
     let cieMarks, seeMarks, totalMarks;
     
     if (subject.isProject) {
-      // Project courses only have SEE marks
-      console.log(`   Project course - using only SEE from column index: ${subject.seeColumnIndex}`);
+      // Project and NCMC Report courses only have SEE marks
+      const courseLabel = subject.isNCMC ? 'NCMC Report' : 'Project';
+      console.log(`   ${courseLabel} course - using only SEE from column index: ${subject.seeColumnIndex}`);
       
-      cieMarks = studentData.map(() => 0); // No CIE for projects
+      cieMarks = studentData.map(() => 0); // No CIE for projects/NCMC
       seeMarks = studentData.map((s, i) => {
         const val = parseFloat(s._rawRow[subject.seeColumnIndex]) || 0;
         if (i === 0) console.log(`   First student SEE value: "${s._rawRow[subject.seeColumnIndex]}" -> ${val}`);
         return val;
       });
-      totalMarks = seeMarks; // Total = SEE only for projects
+      totalMarks = seeMarks; // Total = SEE only for projects/NCMC
     } else {
       // Regular courses have both CIE and SEE
       console.log(`   Looking for CIE in column index: ${subject.cieColumnIndex}`);
@@ -381,10 +391,13 @@ function analyzeExcelFile(fileBuffer) {
   const passedStudents = studentData.filter(student => {
     let allPassed = true;
     subjectPairs.forEach(subject => {
+      // Skip NCMC Report courses for pass/fail determination
+      if (subject.excludeFromPercentage) return;
+      
       if (subject.isProject) {
-        // For projects, only check SEE (no CIE)
+        // For projects and NCMC, only check SEE (no CIE)
         const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
-        if (see < 40) allPassed = false; // Need 40 in SEE for projects
+        if (see < 40) allPassed = false; // Need 40 in SEE for projects/NCMC
       } else {
         // For regular courses, check both CIE and SEE
         const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
@@ -415,7 +428,7 @@ function analyzeExcelFile(fileBuffer) {
   const students = studentData.map((student, index) => {
     const marks = subjectPairs.map(subject => {
       if (subject.isProject) {
-        // For projects, only SEE marks
+        // For projects and NCMC, only SEE marks (no CIE)
         const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
         return see;
       } else {
@@ -429,14 +442,16 @@ function analyzeExcelFile(fileBuffer) {
     // Create subjects array with CIE/SEE breakdown for each subject
     const subjects = subjectPairs.map(subject => {
       if (subject.isProject) {
-        // For projects, only SEE
+        // For projects and NCMC, only SEE marks (no CIE)
         const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
         return {
-          cie: 'N/A', // No CIE for projects
+          cie: 'N/A', // No CIE for projects/NCMC
           see: see,
           total: see,
           courseCode: subject.courseCode,
-          isProject: true
+          isProject: true,
+          isNCMC: subject.isNCMC || false,
+          excludeFromPercentage: subject.excludeFromPercentage || false
         };
       } else {
         // For regular courses
@@ -447,21 +462,29 @@ function analyzeExcelFile(fileBuffer) {
           see: see,
           total: cie + see,
           courseCode: subject.courseCode,
-          isProject: false
+          isProject: false,
+          isNCMC: false,
+          excludeFromPercentage: false
         };
       }
     });
     
-    const total = marks.reduce((a, b) => a + b, 0);
-    const avg = marks.length > 0 ? total / marks.length : 0;
+    // Calculate total and average - EXCLUDING NCMC Report courses
+    const marksForPercentage = marks.filter((_, idx) => !subjectPairs[idx].excludeFromPercentage);
+    const total = marksForPercentage.reduce((a, b) => a + b, 0);
+    const avg = marksForPercentage.length > 0 ? total / marksForPercentage.length : 0;
     
     // Check if passed (all subjects >= 40 and SEE >= 18)
+    // NCMC Report courses are not considered for pass/fail
     let passed = true;
     subjectPairs.forEach(subject => {
+      // Skip NCMC Report courses for pass/fail determination
+      if (subject.excludeFromPercentage) return;
+      
       if (subject.isProject) {
-        // For projects, only check SEE
+        // For projects and NCMC, only check SEE
         const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
-        if (see < 40) passed = false; // Need 40 in SEE for projects
+        if (see < 40) passed = false; // Need 40 in SEE for projects/NCMC
       } else {
         // For regular courses, check both CIE and SEE
         const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
@@ -471,8 +494,9 @@ function analyzeExcelFile(fileBuffer) {
       }
     });
     
-    // Calculate grade based on percentage
-    const percentage = Math.round((total / (marks.length * 100)) * 100 * 100) / 100;
+    // Calculate grade based on percentage (EXCLUDING NCMC Report courses)
+    const countableSubjects = subjectPairs.filter(s => !s.excludeFromPercentage).length;
+    const percentage = countableSubjects > 0 ? Math.round((total / (countableSubjects * 100)) * 100 * 100) / 100 : 0;
     let grade = 'F';
     
     // Only assign grade if student passed, otherwise grade is 'F'
@@ -551,7 +575,9 @@ function analyzeExcelFile(fileBuffer) {
     courseNames: courseNames,
     courseTypes: subjectPairs.map(s => ({
       courseCode: s.courseCode,
-      isProject: s.isProject || false
+      isProject: s.isProject || false,
+      isNCMC: s.isNCMC || false,
+      excludeFromPercentage: s.excludeFromPercentage || false
     })),
     summary: {
       overallAvg: Math.round(overallAvg * 100) / 100,

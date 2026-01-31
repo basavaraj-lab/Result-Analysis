@@ -72,6 +72,7 @@ function initializeCourseManagement() {
           <option>Theory</option>
           <option>Lab</option>
           <option>Project</option>
+          <option>NCMC Report</option>
         </select>`;
       const c5 = row.insertCell(); c5.innerHTML = `<input type="number" id="maxCIE${count}" name="maxCIE${count}" placeholder="Enter MAX CIE" class="max-cie" autocomplete="off">`;
       const c6 = row.insertCell(); c6.innerHTML = `<input type="number" id="minCIE${count}" name="minCIE${count}" placeholder="Enter MIN CIE" class="min-cie" autocomplete="off">`;
@@ -269,18 +270,18 @@ function initializeStudentManagement() {
       const courseCodeRow = ['Course Code', '', ''];
       courses.forEach(course => {
         courseCodeRow.push(course.courseCode);
-        // Only add empty cell for SEE if not a Project course
-        if (course.courseType !== 'Project') {
+        // Only add empty cell for SEE if not a Project or NCMC Report course
+        if (course.courseType !== 'Project' && course.courseType !== 'NCMC Report') {
           courseCodeRow.push(''); // Empty cell for SEE column
         }
       });
       resultData.push(courseCodeRow);
       
-      // Row 6: Column Headers (S.N., USN, NAME, CIE, SEE for each course or just SEE for Project)
+      // Row 6: Column Headers (S.N., USN, NAME, CIE, SEE for each course or just SEE for Project/NCMC)
       const headerRow = ['S.N.', 'USN', 'NAME'];
       courses.forEach((course) => {
-        if (course.courseType === 'Project') {
-          // For Project courses, only add SEE column
+        if (course.courseType === 'Project' || course.courseType === 'NCMC Report') {
+          // For Project and NCMC Report courses, only add SEE column (no CIE)
           headerRow.push('SEE');
         } else {
           // For other courses, add both CIE and SEE
@@ -295,8 +296,8 @@ function initializeStudentManagement() {
         const row = [idx + 1, student.usn, student.name];
         // Add empty CIE and SEE cells for each course
         courses.forEach((course) => {
-          if (course.courseType === 'Project') {
-            // For Project courses, only add SEE cell
+          if (course.courseType === 'Project' || course.courseType === 'NCMC Report') {
+            // For Project and NCMC Report courses, only add SEE cell (no CIE)
             row.push(''); // SEE
           } else {
             // For other courses, add both CIE and SEE cells
@@ -317,9 +318,9 @@ function initializeStudentManagement() {
         courseData.push(['S.No', 'Course Code', 'Course Title', 'Staff Incharge', 'Course Type', 'MAX CIE', 'MIN CIE', 'MAX SEE', 'MIN SEE', 'Total MAX', 'Total MIN']);
         
         courses.forEach((c, idx) => {
-          // For Project courses, set CIE values to N/A or empty
-          const maxCIE = c.courseType === 'Project' ? 'N/A' : c.maxCIE;
-          const minCIE = c.courseType === 'Project' ? 'N/A' : c.minCIE;
+          // For Project and NCMC Report courses, set CIE values to N/A or empty
+          const maxCIE = (c.courseType === 'Project' || c.courseType === 'NCMC Report') ? 'N/A' : c.maxCIE;
+          const minCIE = (c.courseType === 'Project' || c.courseType === 'NCMC Report') ? 'N/A' : c.minCIE;
           
           courseData.push([
             idx + 1,

@@ -282,7 +282,29 @@ footer {
                 return;
             }
 
-            // ==================== PAGE 1: HEADER & OVERVIEW ====================
+            // ==================== PAGE 1: ADD NAVBAR IMAGE ====================
+            // Load and add navbar.jpeg image at the top
+            const navbarImg = new Image();
+            navbarImg.src = 'navbar.jpeg';
+            
+            await new Promise((resolve, reject) => {
+                navbarImg.onload = () => {
+                    // Calculate image dimensions to fit width
+                    const imgWidth = pageWidth - (2 * margin);
+                    const imgHeight = (navbarImg.height * imgWidth) / navbarImg.width;
+                    
+                    // Add image to PDF
+                    pdf.addImage(navbarImg, 'JPEG', margin, yPosition, imgWidth, imgHeight);
+                    yPosition += imgHeight + 10; // Add spacing after image
+                    resolve();
+                };
+                navbarImg.onerror = () => {
+                    console.log('Navbar image not found, continuing without it');
+                    resolve(); // Continue even if image fails to load
+                };
+            });
+
+            // ==================== HEADER & OVERVIEW ====================
             // Get branch and semester info from analysis data
             const analysisData = window.currentAnalysisData || {};
             const branchName = analysisData.branch || 'Department';

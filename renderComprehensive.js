@@ -129,6 +129,10 @@ function renderComprehensiveAnalysis(data) {
         `;
     });
 
+    // Declare courseTypes early so it can be used in the template
+    const courseCodes = data.courseCodes || subjectNames;
+    const courseTypes = data.courseTypes || [];
+
     html += `
                     </tbody>
                 </table>
@@ -136,6 +140,10 @@ function renderComprehensiveAnalysis(data) {
 
             <!-- Student Results Table -->
             <h3 style="color: #0078D7; margin-top: 1rem;">👨‍🎓 Student-wise Results</h3>
+            ${courseTypes.some(ct => ct.isNCMC || ct.excludeFromPercentage) ? 
+                '<p style="color: #666; font-style: italic; margin-top: 0.5rem; font-size: 14px;">📝 Note: NCMC Report courses are displayed but not included in percentage calculation.</p>' : 
+                ''
+            }
             <div style="overflow-x: auto; margin-top: 1rem;">
                 <table style="width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 13px; border-radius: 2px; overflow: hidden; color: #000000;">
                     <thead>
@@ -149,16 +157,16 @@ function renderComprehensiveAnalysis(data) {
     `;
 
     // Add subject columns (CIE and SEE for each)
-    const courseCodes = data.courseCodes || subjectNames;
-    const courseTypes = data.courseTypes || [];
-    
     courseCodes.forEach((code, idx) => {
+        const courseType = courseTypes[idx] || {};
+        const isNCMC = courseType.isNCMC || courseType.excludeFromPercentage || false;
         const displayText = code !== subjectNames[idx] ? `${code}<br/><small>${subjectNames[idx]}</small>` : code;
-        const isProject = courseTypes[idx]?.isProject || false;
+        const finalDisplay = isNCMC ? `${displayText}<br/><small style="color: #888;">(Not in %)</small>` : displayText;
+        const isProject = courseType.isProject || false;
         const colspan = isProject ? "1" : "2"; // Project courses only have SEE column
         
         html += `
-                            <th colspan="${colspan}" style="padding: 8px; border: 1px solid black; font-size: 12px;">${displayText}</th>
+                            <th colspan="${colspan}" style="padding: 8px; border: 1px solid black; font-size: 12px;">${finalDisplay}</th>
         `;
     });
 
@@ -173,7 +181,7 @@ function renderComprehensiveAnalysis(data) {
         const isProject = courseTypes[idx]?.isProject || false;
         
         if (isProject) {
-            // Project courses only have SEE
+            // Project and NCMC courses only have SEE (no CIE)
             html += `
                             <th style="padding: 4px; border: 1px solid black; font-size: 11px; font-weight: bold; color: #000000;">SEE</th>
             `;
@@ -231,7 +239,7 @@ function renderComprehensiveAnalysis(data) {
             const isProject = courseTypes[subjIdx]?.isProject || false;
             
             if (isProject) {
-                // Project courses only show SEE
+                // Project and NCMC courses only show SEE (no CIE)
                 const seeColor = subj.see < 40 ? 'red' : 'black';
                 html += `
                 <td style="padding: 6px; border: 1px solid black; text-align: center; color: ${seeColor};">${subj.see}</td>
@@ -389,7 +397,7 @@ function createCharts(data) {
     const subjectPassCtx = document.getElementById('subjectPassChart');
     if (subjectPassCtx) {
         const labels = subjectStats.map(stat => stat.courseCode || stat.subject);
-        const passPercentages = subjectStats.map(stat => stat.passPercentage);
+        const passPercentages = subjectStats.map(stat => stat.passPercent || stat.passPercentage || 0);
 
         new Chart(subjectPassCtx, {
             type: 'bar',
