@@ -340,6 +340,44 @@ footer {
                 yPosition += imgHeight + 10;
             }
 
+            // ==================== COURSE DETAILS ====================
+            // Check if course details table exists
+            const courseDetailsDiv = resultDiv.querySelector('h3[style*="color: #000000"]');
+            if (courseDetailsDiv && courseDetailsDiv.textContent.includes('Course Details')) {
+                // Find the course details table
+                const courseTable = courseDetailsDiv.nextElementSibling?.querySelector('table');
+                if (courseTable) {
+                    // Check if we need a new page
+                    if (yPosition > pageHeight - 100) {
+                        pdf.addPage();
+                        yPosition = margin;
+                    }
+                    
+                    pdf.setFontSize(16);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text('COURSE DETAILS', pageWidth / 2, yPosition, { align: 'center' });
+                    yPosition += 12;
+
+                    const canvas = await html2canvas(courseTable, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: '#ffffff'
+                    });
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgWidth = pageWidth - (2 * margin);
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    // Check if table fits on current page
+                    if (yPosition + imgHeight > pageHeight - 20) {
+                        pdf.addPage();
+                        yPosition = margin;
+                    }
+                    
+                    pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+                    yPosition += imgHeight + 10;
+                }
+            }
+
             // ==================== GRAPHICAL ANALYSIS ====================
             pdf.addPage();
             yPosition = margin;
@@ -388,9 +426,19 @@ footer {
             pdf.text('SUBJECT-WISE INDICATORS', pageWidth / 2, yPosition, { align: 'center' });
             yPosition += 12;
 
-            // Find the subject-wise table
+            // Find the subject-wise indicators table (the one with color-coded borders)
             const tables = resultDiv.querySelectorAll('table');
-            const subjectTable = tables[0]; // First table is subject-wise
+            let subjectTable = null;
+            
+            // Subject-wise table has "border: 2px solid #000000" and contains indicators
+            for (let table of tables) {
+                const tableStyle = table.getAttribute('style') || '';
+                const firstCell = table.querySelector('th');
+                if (firstCell && firstCell.textContent.includes('Indicators')) {
+                    subjectTable = table;
+                    break;
+                }
+            }
             
             if (subjectTable) {
                 const canvas = await html2canvas(subjectTable, {
@@ -420,8 +468,18 @@ footer {
             pdf.text('STUDENT-WISE RESULTS', pageWidth / 2, yPosition, { align: 'center' });
             yPosition += 12;
 
-            // Find the student-wise table
-            const studentTable = tables[1]; // Second table is student-wise
+            // Find the student-wise table (the one with S.N., USN, NAME columns)
+            let studentTable = null;
+            for (let table of tables) {
+                const headerCells = table.querySelectorAll('thead th');
+                for (let cell of headerCells) {
+                    if (cell.textContent.includes('USN') || cell.textContent.includes('NAME')) {
+                        studentTable = table;
+                        break;
+                    }
+                }
+                if (studentTable) break;
+            }
             
             if (studentTable) {
                 const canvas = await html2canvas(studentTable, {
@@ -492,7 +550,7 @@ footer {
             // Save the PDF
             pdf.save(fileName);
 
-            alert(`✅ PDF EXPORTED SUCCESSFULLY!\n\nFile: ${fileName}\n\nIncluded:\n• Comprehensive Result Analysis\n• Graphical Analysis (All Charts)\n• Subject-wise Indicators\n• Student-wise Results\n• HOD Signature\n\nDownloaded to your Downloads folder.`);
+            alert(`✅ PDF EXPORTED SUCCESSFULLY!\n\nFile: ${fileName}\n\nIncluded:\n• Comprehensive Result Analysis\n• Course Details\n• Graphical Analysis (All Charts)\n• Subject-wise Indicators\n• Student-wise Results\n• HOD Signature\n\nDownloaded to your Downloads folder.`);
 
         } catch (error) {
             console.error('PDF Export Error:', error);

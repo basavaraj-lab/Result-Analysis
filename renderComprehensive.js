@@ -15,7 +15,7 @@ function renderComprehensiveAnalysis(data) {
     resultDiv.style.visibility = 'visible';
     resultDiv.style.opacity = '1';
 
-    const { classStats, subjectStats, students, subjectNames, academicYear, branch, semester } = data;
+    const { classStats, subjectStats, students, subjectNames, academicYear, branch, semester, courseDetails } = data;
 
     let html = `
         <div style="padding: 20px; background: white;">
@@ -37,6 +37,35 @@ function renderComprehensiveAnalysis(data) {
                 <p><strong>Failed:</strong> <span style="color: red;">${classStats.failed}</span></p>
                 <p><strong>Pass Percentage:</strong> ${classStats.passPercentage}%</p>
             </div>
+
+            <!-- Course Details Table -->
+            ${courseDetails && courseDetails.length > 0 ? `
+            <div style="margin: 20px 0;">
+                <h3 style="color: #000000; margin-bottom: 15px;">📚 Course Details</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; border: 2px solid #000000; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <thead>
+                            <tr style="background: #000000; color: white;">
+                                <th style="padding: 12px; border: 1px solid #000000; text-align: center; font-weight: bold; color: black;">S.N.</th>
+                                <th style="padding: 12px; border: 1px solid #000000; text-align: left; font-weight: bold; color: black;">Course Code</th>
+                                <th style="padding: 12px; border: 1px solid #000000; text-align: left; font-weight: bold; color: black;">Course Name</th>
+                                <th style="padding: 12px; border: 1px solid #000000; text-align: left; font-weight: bold; color: black;">Staff Incharge</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${courseDetails.map((course, index) => `
+                            <tr style="background: ${index % 2 === 0 ? '#f8f9fa' : 'white'};">
+                                <td style="padding: 10px; border: 1px solid #000000; text-align: center;">${course.sno || index + 1}</td>
+                                <td style="padding: 10px; border: 1px solid #000000; font-weight: 600;">${course.courseCode}</td>
+                                <td style="padding: 10px; border: 1px solid #000000;">${course.courseTitle}</td>
+                                <td style="padding: 10px; border: 1px solid #000000;">${course.staffIncharge}</td>
+                            </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            ` : ''}
 
             <!-- Graphical Representations -->
             <h3 style="color: #0078D7; margin-top: 2rem; text-align: center;">📈 Graphical Analysis</h3>

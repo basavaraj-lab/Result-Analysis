@@ -56,8 +56,9 @@ function analyzeExcelFile(fileBuffer) {
   
   console.log('📈 Total rows:', jsonData.length);
   
-  // Read Course Details sheet if it exists to get course types
+  // Read Course Details sheet if it exists to get course types and details
   const courseTypes = {};
+  const courseDetails = [];
   if (workbook.SheetNames.includes('Course Details')) {
     console.log('📚 Reading Course Details sheet...');
     const courseSheet = workbook.Sheets['Course Details'];
@@ -72,12 +73,22 @@ function analyzeExcelFile(fileBuffer) {
         // Found header row, now read course data
         for (let j = i + 1; j < courseData.length; j++) {
           const dataRow = courseData[j];
+          const sno = String(dataRow[0] || '').trim(); // Column A - S.No
           const courseCode = String(dataRow[1] || '').trim(); // Column B - Course Code
+          const courseTitle = String(dataRow[2] || '').trim(); // Column C - Course Title
+          const staffIncharge = String(dataRow[3] || '').trim(); // Column D - Staff Incharge
           const courseType = String(dataRow[4] || '').trim(); // Column E - Course Type
           
           if (courseCode && courseType) {
             courseTypes[courseCode] = courseType;
-            console.log(`   Course ${courseCode}: Type = ${courseType}`);
+            courseDetails.push({
+              sno: sno || (j - i),
+              courseCode: courseCode,
+              courseTitle: courseTitle,
+              staffIncharge: staffIncharge,
+              courseType: courseType
+            });
+            console.log(`   Course ${courseCode}: ${courseTitle} - ${staffIncharge} (${courseType})`);
           }
         }
         break;
@@ -86,6 +97,7 @@ function analyzeExcelFile(fileBuffer) {
   }
   
   console.log('📋 Course Types:', courseTypes);
+  console.log('📚 Course Details:', courseDetails);
   
   // Extract header information (Academic Year, Branch, Semester)
   let academicYear = '';
@@ -573,6 +585,7 @@ function analyzeExcelFile(fileBuffer) {
     subjectNames: subjectPairs.map(s => s.courseCode),
     courseCodes: courseCodes,
     courseNames: courseNames,
+    courseDetails: courseDetails,
     courseTypes: subjectPairs.map(s => ({
       courseCode: s.courseCode,
       isProject: s.isProject || false,
