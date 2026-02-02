@@ -26,10 +26,11 @@
     text-align: center;
 }
 
-.navbar img {
+.navbar{
     width: 100%;
     height: 200px;
     object-fit: cover;
+    background-color: #003366;
 }
 
 .data h3 {
@@ -161,15 +162,17 @@ footer {
 
     
     <div class="navbar">
-        <img src="navbar.jpeg" alt="KVG Logo">
+        <div class="nav-title">KVG College of Engineering</div>
+        <div class="nav-subtitle">Department of Electronics & Communication Engineering</div>
+        <div class="nav-sub2">SKILL LAB PROJECT</div>
     </div>
 
     <div class="data">
         <h3>5th SEMESTER E&C MINI PROJECT - 2025-26</h3>
-        <h1>EXAMINATION RESULT ANALYSIS</h1>
+        <h1 style="color: black;">EXAMINATION RESULT ANALYSIS</h1>
     </div>
 
-    <h2>RESULT ANALYSIS</h2>
+    <!-- <h2>RESULT ANALYSIS</h2> -->
 
     <!-- Upload Excel -->
     <div class="uploadfile">
@@ -253,11 +256,14 @@ footer {
             return;
         }
 
+        // Store original text before try block
+        const exportBtn = document.getElementById('exportBtn');
+        const originalText = exportBtn.textContent;
+
         try {
             // Show loading message
-            const originalText = document.getElementById('exportBtn').textContent;
-            document.getElementById('exportBtn').textContent = 'Generating PDF...';
-            document.getElementById('exportBtn').disabled = true;
+            exportBtn.textContent = 'Generating PDF...';
+            exportBtn.disabled = true;
 
             // Create new PDF document (landscape for better table display)
             const pdf = new jsPDF('l', 'mm', 'a4'); // landscape orientation
@@ -277,32 +283,38 @@ footer {
             
             if (!resultDiv || resultDiv.style.display === 'none') {
                 alert('No analysis results to export. Please analyze a file first.');
-                document.getElementById('exportBtn').textContent = originalText;
-                document.getElementById('exportBtn').disabled = false;
+                exportBtn.textContent = originalText;
+                exportBtn.disabled = false;
                 return;
             }
 
-            // ==================== PAGE 1: ADD NAVBAR IMAGE ====================
-            // Load and add navbar.jpeg image at the top
-            const navbarImg = new Image();
-            navbarImg.src = 'navbar.jpeg';
+            // ==================== PAGE 1: ADD NAVBAR HEADER ====================
+            // Add navbar header with college information
+            // Draw a colored rectangle for navbar background
+            pdf.setFillColor(0, 51, 102); // #003366
+            pdf.rect(margin, yPosition, pageWidth - (2 * margin), 35, 'F');
             
-            await new Promise((resolve, reject) => {
-                navbarImg.onload = () => {
-                    // Calculate image dimensions to fit width
-                    const imgWidth = pageWidth - (2 * margin);
-                    const imgHeight = (navbarImg.height * imgWidth) / navbarImg.width;
-                    
-                    // Add image to PDF
-                    pdf.addImage(navbarImg, 'JPEG', margin, yPosition, imgWidth, imgHeight);
-                    yPosition += imgHeight + 10; // Add spacing after image
-                    resolve();
-                };
-                navbarImg.onerror = () => {
-                    console.log('Navbar image not found, continuing without it');
-                    resolve(); // Continue even if image fails to load
-                };
-            });
+            // Add navbar text content
+            pdf.setTextColor(255, 255, 255); // White text
+            
+            // College name
+            pdf.setFontSize(22);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('KVG College of Engineering', pageWidth / 2, yPosition + 10, { align: 'center' });
+            
+            // Department
+            pdf.setFontSize(11);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('Department of Electronics & Communication Engineering', pageWidth / 2, yPosition + 18, { align: 'center' });
+            
+            // Skill Lab Project
+            pdf.setFontSize(18);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('SKILL LAB PROJECT', pageWidth / 2, yPosition + 28, { align: 'center' });
+            
+            // Reset text color to black for remaining content
+            pdf.setTextColor(0, 0, 0);
+            yPosition += 45; // Move position after navbar
 
             // ==================== HEADER & OVERVIEW ====================
             // Get branch and semester info from analysis data
@@ -340,11 +352,11 @@ footer {
                 yPosition += imgHeight + 10;
             }
 
-            // ==================== COURSE DETAILS ====================
-            // Check if course details table exists
+            // ==================== COURSE WISE RESULT ====================
+            // Check if course wise result table exists
             const courseDetailsDiv = resultDiv.querySelector('h3[style*="color: #000000"]');
-            if (courseDetailsDiv && courseDetailsDiv.textContent.includes('Course Details')) {
-                // Find the course details table
+            if (courseDetailsDiv && courseDetailsDiv.textContent.includes('Course wise result')) {
+                // Find the course wise result table
                 const courseTable = courseDetailsDiv.nextElementSibling?.querySelector('table');
                 if (courseTable) {
                     // Check if we need a new page
@@ -355,7 +367,7 @@ footer {
                     
                     pdf.setFontSize(16);
                     pdf.setFont('helvetica', 'bold');
-                    pdf.text('COURSE DETAILS', pageWidth / 2, yPosition, { align: 'center' });
+                    pdf.text('COURSE WISE RESULT', pageWidth / 2, yPosition, { align: 'center' });
                     yPosition += 12;
 
                     const canvas = await html2canvas(courseTable, {
@@ -550,15 +562,15 @@ footer {
             // Save the PDF
             pdf.save(fileName);
 
-            alert(`✅ PDF EXPORTED SUCCESSFULLY!\n\nFile: ${fileName}\n\nIncluded:\n• Comprehensive Result Analysis\n• Course Details\n• Graphical Analysis (All Charts)\n• Subject-wise Indicators\n• Student-wise Results\n• HOD Signature\n\nDownloaded to your Downloads folder.`);
+            alert(`✅ PDF EXPORTED SUCCESSFULLY!\n\nFile: ${fileName}\n\nIncluded:\n• Comprehensive Result Analysis\n• Course wise result\n• Graphical Analysis (All Charts)\n• Subject-wise Indicators\n• Student-wise Results\n• HOD Signature\n\nDownloaded to your Downloads folder.`);
 
         } catch (error) {
             console.error('PDF Export Error:', error);
             alert('❌ Error generating PDF: ' + error.message);
         } finally {
-            // Reset button
-            document.getElementById('exportBtn').textContent = originalText;
-            document.getElementById('exportBtn').disabled = false;
+            // Always reset button to ensure it's clickable again
+            exportBtn.textContent = originalText;
+            exportBtn.disabled = false;
         }
     }
     </script>

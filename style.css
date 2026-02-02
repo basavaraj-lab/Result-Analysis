@@ -8,34 +8,31 @@ body{
 .navbar{
     height: 200px;
     width: 100%;
-    background-color: black;
-}
-.navbar img{
-   height: auto;
-   width: 100%;
+    /* background-color: black; */
 }
 
 .data{
-    height: 100px;
+    height: 30px;
     width: 100%;
     text-align: center;
 }
 .doneby{
-    height: 200px;
+    height: 40px;
     width: 100%;
     text-align: center;
 }
 .doneby-header {
-    padding-left: 300px;
+    padding-left: 480px;
     color: black;
     font-size: 20px;
     font-weight: 600;
-    margin: 10px 0;
+    /* margin: 10px 0; */
 }
 .profile{
-    height: 200px;
+    height: 120px;
     width: 100%;
     text-align: center;
+    margin-top: 0px;
 }
 .name {
       font-size: 25px;
@@ -58,7 +55,7 @@ body{
     /*btns*/
 
     .btns {
-    height: 400px;
+    height: 360px;
     width: 100%;
     border-radius: 5px;
     display: flex;

@@ -38,10 +38,10 @@ function renderComprehensiveAnalysis(data) {
                 <p><strong>Pass Percentage:</strong> ${classStats.passPercentage}%</p>
             </div>
 
-            <!-- Course Details Table -->
+            <!-- Course wise result Table -->
             ${courseDetails && courseDetails.length > 0 ? `
             <div style="margin: 20px 0;">
-                <h3 style="color: #000000; margin-bottom: 15px;">📚 Course Details</h3>
+                <h3 style="color: #000000; margin-bottom: 15px;">📚 Course wise result</h3>
                 <div style="overflow-x: auto;">
                     <table style="width: 100%; border-collapse: collapse; border: 2px solid #000000; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         <thead>
@@ -50,17 +50,28 @@ function renderComprehensiveAnalysis(data) {
                                 <th style="padding: 12px; border: 1px solid #000000; text-align: left; font-weight: bold; color: black;">Course Code</th>
                                 <th style="padding: 12px; border: 1px solid #000000; text-align: left; font-weight: bold; color: black;">Course Name</th>
                                 <th style="padding: 12px; border: 1px solid #000000; text-align: left; font-weight: bold; color: black;">Staff Incharge</th>
+                                <th style="padding: 12px; border: 1px solid #000000; text-align: center; font-weight: bold; color: black;">Pass %</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${courseDetails.map((course, index) => `
+                            ${courseDetails.map((course, index) => {
+                                // Find the corresponding subject stats for pass percentage
+                                const subjectStat = (subjectStats || []).find(stat => 
+                                    stat.subject === course.courseCode || stat.courseCode === course.courseCode
+                                );
+                                const passPercent = subjectStat ? subjectStat.passPercent : 0;
+                                const passColor = passPercent >= 90 ? '#28a745' : passPercent >= 70 ? '#ffc107' : passPercent >= 50 ? '#ff9800' : '#dc3545';
+                                
+                                return `
                             <tr style="background: ${index % 2 === 0 ? '#f8f9fa' : 'white'};">
                                 <td style="padding: 10px; border: 1px solid #000000; text-align: center;">${course.sno || index + 1}</td>
                                 <td style="padding: 10px; border: 1px solid #000000; font-weight: 600;">${course.courseCode}</td>
                                 <td style="padding: 10px; border: 1px solid #000000;">${course.courseTitle}</td>
                                 <td style="padding: 10px; border: 1px solid #000000;">${course.staffIncharge}</td>
+                                <td style="padding: 10px; border: 1px solid #000000; text-align: center; font-weight: bold; color: ${passColor};">${passPercent.toFixed(2)}%</td>
                             </tr>
-                            `).join('')}
+                            `;
+                            }).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -321,23 +332,34 @@ function renderComprehensiveAnalysis(data) {
 function createCharts(data) {
     const { classStats, subjectStats, students } = data;
 
-    // 1. Pass/Fail Pie Chart with Top 3 Rankers
+    // 1. Pass/Fail Distribution Pie Chart (FCD, FC, SC, P, Fail)
     const passFailCtx = document.getElementById('passFailChart');
     if (passFailCtx) {
-        // Count students by category
-        const firstRank = students.filter(s => s.rank === 1).length;
-        const secondRank = students.filter(s => s.rank === 2).length;
-        const thirdRank = students.filter(s => s.rank === 3).length;
-        const otherPassed = classStats.passed - firstRank - secondRank - thirdRank;
-        const failed = classStats.failed;
+        // Count students by grade category
+        const gradeCounts = {
+            FCD: 0,
+            FC: 0,
+            SC: 0,
+            P: 0,
+            F: 0
+        };
+
+        students.forEach(student => {
+            // Count all grades including F (fail)
+            if (student.grade === 'FCD') gradeCounts.FCD++;
+            else if (student.grade === 'FC') gradeCounts.FC++;
+            else if (student.grade === 'SC') gradeCounts.SC++;
+            else if (student.grade === 'P') gradeCounts.P++;
+            else if (student.grade === 'F' || student.result === 'FAIL') gradeCounts.F++;
+        });
 
         new Chart(passFailCtx, {
             type: 'pie',
             data: {
-                labels: ['🥇 1st Rank', '🥈 2nd Rank', '🥉 3rd Rank', 'Other Passed', 'Failed'],
+                labels: ['FCD (≥70%)', 'FC (60-69%)', 'SC (50-59%)', 'P (40-49%)', 'Fail (<40%)'],
                 datasets: [{
-                    data: [firstRank, secondRank, thirdRank, otherPassed, failed],
-                    backgroundColor: ['#FFD700', '#C0C0C0', '#CD7F32', '#28a745', '#dc3545'],
+                    data: [gradeCounts.FCD, gradeCounts.FC, gradeCounts.SC, gradeCounts.P, gradeCounts.F],
+                    backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#fd7e14', '#dc3545'],
                     borderWidth: 2,
                     borderColor: '#fff'
                 }]

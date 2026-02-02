@@ -49,11 +49,34 @@ body {
 .navbar{
     height: 200px;
     width: 100%;
-    background-color: black;
+    background-color: #003366;
+    color: white;
+    padding: 20px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
 }
-.navbar img{
-   height: auto;
-   width: 100%;
+.nav-title {
+    font-size: 60px;
+    font-weight: bold;
+    margin: 0;
+    line-height: 1.2;
+}
+.nav-subtitle {
+    font-size: 24px;
+    margin: 8px 0;
+    line-height: 1.3;
+}
+.data {
+    text-align: center;
+}
+.nav-sub2 {
+    font-size: 60px;
+    margin: 8px 0 0 0;
+    font-weight: bold;
+    line-height: 1.2;
 }
 
 .data{
