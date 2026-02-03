@@ -187,6 +187,7 @@ function analyzeExcelFile(fileBuffer) {
   // Extract student data
   const studentData = [];
   const dataStartRow = headerRowIndex + 1;
+  const seenUSNs = new Set(); // Track USNs to prevent duplicates
   
   console.log('📋 Headers found:', headers);
   console.log('🔍 Starting to read student data from row', dataStartRow + 1);
@@ -207,12 +208,20 @@ function analyzeExcelFile(fileBuffer) {
     // Get USN - usually in column 1 or 2
     const usn = String(studentRow[headers[1]] || studentRow.USN || '').trim();
     if (usn && usn.length > 2 && !usn.toLowerCase().includes('usn') && !usn.toLowerCase().includes('s.n')) {
+      // Check for duplicate USN
+      if (seenUSNs.has(usn)) {
+        console.log(`⚠️  Duplicate USN found: ${usn} - skipping`);
+        continue;
+      }
+      
       console.log(`👤 Student ${studentData.length + 1}: USN=${usn}, Row data:`, row.slice(0, 10));
       studentData.push(studentRow);
+      seenUSNs.add(usn);
     }
   }
   
   console.log('👨‍🎓 Students found:', studentData.length);
+  console.log('🔍 Unique USNs:', seenUSNs.size);
   
   if (studentData.length === 0) {
     throw new Error('No valid student data found in Excel file');
@@ -363,7 +372,21 @@ function analyzeExcelFile(fileBuffer) {
     if (validTotalMarks.length > 0) {
       const sum = validTotalMarks.reduce((a, b) => a + b, 0);
       const avg = sum / validTotalMarks.length;
-      const passCount = validTotalMarks.filter(m => m >= 40).length;
+      
+      // Calculate pass count based on proper criteria
+      let passCount = 0;
+      if (subject.isProject) {
+        // For projects and NCMC: only check SEE >= 40
+        passCount = seeMarks.filter(m => m >= 40).length;
+      } else {
+        // For regular courses: check total >= 40 AND CIE >= 20 AND SEE >= 18
+        passCount = studentData.filter((student, idx) => {
+          const total = totalMarks[idx];
+          const cie = cieMarks[idx];
+          const see = seeMarks[idx];
+          return total >= 40 && cie >= 20 && see >= 18;
+        }).length;
+      }
       
       // Grade distribution for this subject
       const fcdCount = totalMarks.filter(m => m >= 70).length;
@@ -411,11 +434,11 @@ function analyzeExcelFile(fileBuffer) {
         const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
         if (see < 40) allPassed = false; // Need 40 in SEE for projects/NCMC
       } else {
-        // For regular courses, check both CIE and SEE
+        // For regular courses, check total >= 40 AND CIE >= 20 AND SEE >= 18
         const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
         const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
         const total = cie + see;
-        if (total < 40 || see < 18) allPassed = false; // Need 40 total and 18 in SEE
+        if (total < 40 || cie < 20 || see < 18) allPassed = false;
       }
     });
     return allPassed;
@@ -486,7 +509,7 @@ function analyzeExcelFile(fileBuffer) {
     const total = marksForPercentage.reduce((a, b) => a + b, 0);
     const avg = marksForPercentage.length > 0 ? total / marksForPercentage.length : 0;
     
-    // Check if passed (all subjects >= 40 and SEE >= 18)
+    // Check if passed (total >= 40 AND CIE >= 20 AND SEE >= 18)
     // NCMC Report courses are not considered for pass/fail
     let passed = true;
     subjectPairs.forEach(subject => {
@@ -498,11 +521,11 @@ function analyzeExcelFile(fileBuffer) {
         const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
         if (see < 40) passed = false; // Need 40 in SEE for projects/NCMC
       } else {
-        // For regular courses, check both CIE and SEE
+        // For regular courses, check total >= 40 AND CIE >= 20 AND SEE >= 18
         const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
         const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
         const total = cie + see;
-        if (total < 40 || see < 18) passed = false;
+        if (total < 40 || cie < 20 || see < 18) passed = false;
       }
     });
     
