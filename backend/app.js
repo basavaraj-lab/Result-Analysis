@@ -256,21 +256,21 @@ function analyzeExcelFile(fileBuffer) {
     console.log(`   Looking for columns starting at index: ${headerIndex}`);
     
     // Look at the actual header row to determine column structure
-    // The header row should have CIE, SEE or just SEE for projects
+    // The header row should have CIE, SEE or just CIE for projects
     const nextHeader = headers[headerIndex]?.toLowerCase() || '';
     const nextNextHeader = headers[headerIndex + 1]?.toLowerCase() || '';
     
     console.log(`   Header at ${headerIndex}: "${headers[headerIndex]}"`);
     console.log(`   Header at ${headerIndex + 1}: "${headers[headerIndex + 1]}"`);
     
-    if (isProject || isNCMC || nextHeader === 'see') {
-      // Project course or SEE-only course - only one column
-      console.log(`   ✅ Project/SEE-only course - SEE at column ${headerIndex}`);
+    if (isProject || isNCMC || nextHeader === 'cie' && nextNextHeader !== 'see') {
+      // Project/NCMC course - only CIE column
+      console.log(`   ✅ Project/NCMC CIE-only course - CIE at column ${headerIndex}`);
       subjectPairs.push({
         courseCode: courseCode,
         courseName: courseCode,
-        cieColumnIndex: null,
-        seeColumnIndex: headerIndex,
+        cieColumnIndex: headerIndex,
+        seeColumnIndex: null,
         isProject: true,
         isNCMC: isNCMC,
         excludeFromPercentage: isNCMC // NCMC Report is shown but excluded from percentage
@@ -329,17 +329,17 @@ function analyzeExcelFile(fileBuffer) {
     let cieMarks, seeMarks, totalMarks;
     
     if (subject.isProject) {
-      // Project and NCMC Report courses only have SEE marks
+      // Project and NCMC Report courses only have CIE marks
       const courseLabel = subject.isNCMC ? 'NCMC Report' : 'Project';
-      console.log(`   ${courseLabel} course - using only SEE from column index: ${subject.seeColumnIndex}`);
+      console.log(`   ${courseLabel} course - using only CIE from column index: ${subject.cieColumnIndex}`);
       
-      cieMarks = studentData.map(() => 0); // No CIE for projects/NCMC
-      seeMarks = studentData.map((s, i) => {
-        const val = parseFloat(s._rawRow[subject.seeColumnIndex]) || 0;
-        if (i === 0) console.log(`   First student SEE value: "${s._rawRow[subject.seeColumnIndex]}" -> ${val}`);
+      cieMarks = studentData.map((s, i) => {
+        const val = parseFloat(s._rawRow[subject.cieColumnIndex]) || 0;
+        if (i === 0) console.log(`   First student CIE value: "${s._rawRow[subject.cieColumnIndex]}" -> ${val}`);
         return val;
       });
-      totalMarks = seeMarks; // Total = SEE only for projects/NCMC
+      seeMarks = studentData.map(() => 0); // No SEE for projects/NCMC
+      totalMarks = cieMarks; // Total = CIE only for projects/NCMC
     } else {
       // Regular courses have both CIE and SEE
       console.log(`   Looking for CIE in column index: ${subject.cieColumnIndex}`);
@@ -376,8 +376,8 @@ function analyzeExcelFile(fileBuffer) {
       // Calculate pass count based on proper criteria
       let passCount = 0;
       if (subject.isProject) {
-        // For projects and NCMC: only check SEE >= 40
-        passCount = seeMarks.filter(m => m >= 40).length;
+        // For projects and NCMC: only check CIE >= 40
+        passCount = cieMarks.filter(m => m >= 40).length;
       } else {
         // For regular courses: check total >= 40 AND CIE >= 20 AND SEE >= 18
         passCount = studentData.filter((student, idx) => {
@@ -430,9 +430,9 @@ function analyzeExcelFile(fileBuffer) {
       if (subject.excludeFromPercentage) return;
       
       if (subject.isProject) {
-        // For projects and NCMC, only check SEE (no CIE)
-        const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
-        if (see < 40) allPassed = false; // Need 40 in SEE for projects/NCMC
+        // For projects and NCMC, only check CIE (no SEE)
+        const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
+        if (cie < 40) allPassed = false; // Need 40 in CIE for projects/NCMC
       } else {
         // For regular courses, check total >= 40 AND CIE >= 20 AND SEE >= 18
         const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
@@ -477,12 +477,12 @@ function analyzeExcelFile(fileBuffer) {
     // Create subjects array with CIE/SEE breakdown for each subject
     const subjects = subjectPairs.map(subject => {
       if (subject.isProject) {
-        // For projects and NCMC, only SEE marks (no CIE)
-        const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
+        // For projects and NCMC, only CIE marks (no SEE)
+        const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
         return {
-          cie: 'N/A', // No CIE for projects/NCMC
-          see: see,
-          total: see,
+          cie: cie,
+          see: 'N/A', // No SEE for projects/NCMC
+          total: cie,
           courseCode: subject.courseCode,
           isProject: true,
           isNCMC: subject.isNCMC || false,
@@ -517,9 +517,9 @@ function analyzeExcelFile(fileBuffer) {
       if (subject.excludeFromPercentage) return;
       
       if (subject.isProject) {
-        // For projects and NCMC, only check SEE
-        const see = parseFloat(student._rawRow[subject.seeColumnIndex]) || 0;
-        if (see < 40) passed = false; // Need 40 in SEE for projects/NCMC
+        // For projects and NCMC, only check CIE
+        const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
+        if (cie < 40) passed = false; // Need 40 in CIE for projects/NCMC
       } else {
         // For regular courses, check total >= 40 AND CIE >= 20 AND SEE >= 18
         const cie = parseFloat(student._rawRow[subject.cieColumnIndex]) || 0;
