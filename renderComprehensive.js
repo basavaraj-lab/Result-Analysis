@@ -60,7 +60,7 @@ function renderComprehensiveAnalysis(data) {
                                     stat.subject === course.courseCode || stat.courseCode === course.courseCode
                                 );
                                 const passPercent = subjectStat ? subjectStat.passPercent : 0;
-                                const passColor = passPercent >= 90 ? '#28a745' : passPercent >= 70 ? '#ffc107' : passPercent >= 50 ? '#ff9800' : '#dc3545';
+                                const passColor = passPercent >= 85 ? '#28a745' : passPercent >= 70 ? '#ffc107' : passPercent >= 50 ? '#ff9800' : '#dc3545';
                                 
                                 return `
                             <tr style="background: ${index % 2 === 0 ? '#f8f9fa' : 'white'};">
@@ -79,7 +79,7 @@ function renderComprehensiveAnalysis(data) {
             ` : ''}
 
             <!-- Graphical Representations -->
-            <h3 style="color: #0078D7; margin-top: 2rem; text-align: center;">📈 Graphical Analysis</h3>
+            <h3 style="color: #0078D7; margin-top: 2rem; text-align: center;">Overall result analysis</h3>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; margin: 20px 0;">
                 <!-- Pass/Fail Distribution Chart -->
@@ -108,7 +108,7 @@ function renderComprehensiveAnalysis(data) {
             </div>
 
             <!-- Subject-wise Statistics Table -->
-            <h3 style="color: #0078D7; margin-top: 30px;">📚 Subject-wise Indicators</h3>
+            <h3 style="color: #0078D7; margin-top: 30px;">Course wise indicator</h3>
             <div style="overflow-x: auto; margin-bottom: 1rem;">
                 <table style="width: 100%; border-collapse: collapse; margin: 20px 0 1rem 0; font-size: 14px; border-radius: 8px; overflow: hidden; color: #000000; border: 2px solid #000000;">
                     <thead>
@@ -178,6 +178,42 @@ function renderComprehensiveAnalysis(data) {
                 </table>
             </div>
 
+            <!-- Individual Subject Graphs -->
+            <h3 style="color: #0078D7; margin-top: 30px; text-align: center;">📊 Subject-wise Performance Graphs</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; margin: 30px 0;">
+    `;
+
+    // Create a graph for each subject
+    subjectStats.forEach((stat, index) => {
+        const courseCode = stat.courseCode || stat.subject;
+        const courseName = subjectNames[index] || courseCode;
+        const graphId = `subjectGraph_${index}`;
+        
+        html += `
+                <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+                    <h4 style="color: #0078D7; text-align: center; margin-bottom: 5px;">${courseCode}</h4>
+                    <p style="text-align: center; color: #666; font-size: 13px; margin-top: 0; margin-bottom: 15px;">${courseName}</p>
+                    <canvas id="${graphId}" width="400" height="350"></canvas>
+                    
+                    <!-- Stats Summary -->
+                    <div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 13px;">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                            <div><strong>Appeared:</strong> ${stat.appeared || 0}</div>
+                            <div><strong>Pass %:</strong> <span style="color: ${(stat.passPercent || 0) >= 70 ? 'green' : (stat.passPercent || 0) >= 50 ? 'orange' : 'red'}; font-weight: bold;">${(stat.passPercent || 0).toFixed(2)}%</span></div>
+                            <div style="color: green;"><strong>Passed:</strong> ${stat.passed || 0}</div>
+                            <div style="color: red;"><strong>Failed:</strong> ${stat.failed || 0}</div>
+                            <div><strong>FCD:</strong> ${stat.fcd || 0}</div>
+                            <div><strong>FC:</strong> ${stat.fc || 0}</div>
+                            <div><strong>SC:</strong> ${stat.sc || 0}</div>
+                        </div>
+                    </div>
+                </div>
+        `;
+    });
+
+    html += `
+            </div>
+
             <!-- Student Results Table -->
             <h3 style="color: #0078D7; margin-top: 1rem;">👨‍🎓 Student-wise Results</h3>
             ${courseTypes.some(ct => ct.isNCMC || ct.excludeFromPercentage) ? 
@@ -203,7 +239,7 @@ function renderComprehensiveAnalysis(data) {
         const displayText = code !== subjectNames[idx] ? `${code}<br/><small>${subjectNames[idx]}</small>` : code;
         const finalDisplay = isNCMC ? `${displayText}<br/><small style="color: #888;">(Not in %)</small>` : displayText;
         const isProject = courseType.isProject || false;
-        const colspan = isProject ? "1" : "2"; // Project courses only have SEE column
+        const colspan = isProject ? "1" : "2"; // Project and NCMC courses only have CIE column
         
         html += `
                             <th colspan="${colspan}" style="padding: 8px; border: 1px solid black; font-size: 12px;">${finalDisplay}</th>
@@ -221,9 +257,9 @@ function renderComprehensiveAnalysis(data) {
         const isProject = courseTypes[idx]?.isProject || false;
         
         if (isProject) {
-            // Project and NCMC courses only have SEE (no CIE)
+            // Project and NCMC courses only have CIE (no SEE)
             html += `
-                            <th style="padding: 4px; border: 1px solid black; font-size: 11px; font-weight: bold; color: #000000;">SEE</th>
+                            <th style="padding: 4px; border: 1px solid black; font-size: 11px; font-weight: bold; color: #000000;">CIE</th>
             `;
         } else {
             // Regular courses have both CIE and SEE
@@ -279,10 +315,10 @@ function renderComprehensiveAnalysis(data) {
             const isProject = courseTypes[subjIdx]?.isProject || false;
             
             if (isProject) {
-                // Project and NCMC courses only show SEE (no CIE)
-                const seeColor = subj.see < 40 ? 'red' : 'black';
+                // Project and NCMC courses only show CIE (no SEE)
+                const cieColor = subj.cie < 40 ? 'red' : 'black';
                 html += `
-                <td style="padding: 6px; border: 1px solid black; text-align: center; color: ${seeColor};">${subj.see}</td>
+                <td style="padding: 6px; border: 1px solid black; text-align: center; color: ${cieColor};">${subj.cie === 'N/A' ? 'N/A' : subj.cie}</td>
                 `;
             } else {
                 // Regular courses show both CIE and SEE
@@ -308,14 +344,15 @@ function renderComprehensiveAnalysis(data) {
             <!-- Legend -->
             <div style="margin-top: 1rem; padding: 15px; background: #f0f0f0; border-radius: 8px;">
                 <h4 style="color: #0078D7;">Legend:</h4>
-                <p><strong>CIE:</strong> Continuous Internal Evaluation (Min: 20 marks)</p>
+                <p><strong>CIE:</strong> Continuous Internal Evaluation (Min: 20 marks for regular, 40 marks for Project/NCMC)</p>
                 <p><strong>SEE:</strong> Semester End Examination (Min: 18 marks)</p>
                 <p><strong>FCD:</strong> First Class with Distinction (≥70%)</p>
                 <p><strong>FC:</strong> First Class (60-69%)</p>
                 <p><strong>SC:</strong> Second Class (50-59%)</p>
                 <p style="color: green;">● Green rows = PASS</p>
                 <p style="color: red;">● Red rows = FAIL</p>
-                <p style="color: red;">● Red marks = Below minimum (CIE<20 or SEE<18)</p>
+                <p style="color: red;">● Red marks = Below minimum (CIE<20/40 or SEE<18)</p>
+                <p><strong>Note:</strong> Project and NCMC courses show CIE marks only</p>
             </div>
         </div>
     `;
@@ -555,4 +592,81 @@ function createCharts(data) {
             }
         });
     }
+
+    // 5. Individual Subject Performance Charts
+    subjectStats.forEach((stat, index) => {
+        const graphId = `subjectGraph_${index}`;
+        const ctx = document.getElementById(graphId);
+        
+        if (ctx) {
+            const courseCode = stat.courseCode || stat.subject;
+            
+            // Create combined bar chart showing all metrics
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Appeared', 'Passed', 'Failed', 'FCD', 'FC', 'SC'],
+                    datasets: [{
+                        label: 'Number of Students',
+                        data: [
+                            stat.appeared || 0,
+                            stat.passed || 0,
+                            stat.failed || 0,
+                            stat.fcd || 0,
+                            stat.fc || 0,
+                            stat.sc || 0
+                        ],
+                        backgroundColor: [
+                            '#6c757d',  // Appeared - Gray
+                            '#28a745',  // Passed - Green
+                            '#dc3545',  // Failed - Red
+                            '#ffd700',  // FCD - Gold
+                            '#17a2b8',  // FC - Cyan
+                            '#ffc107'   // SC - Yellow
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#333'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    if (context.label === 'Passed' || context.label === 'Failed') {
+                                        const total = stat.appeared || 1;
+                                        const percent = ((context.raw / total) * 100).toFixed(2);
+                                        return `${percent}%`;
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1,
+                                font: { size: 11 }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
 }

@@ -6,9 +6,8 @@ body{
     background-color: white;
 }
 .navbar{
-    height: 200px;
     width: 100%;
-    /* background-color: black; */
+    background-color: #003366;
 }
 
 .data{
@@ -111,6 +110,21 @@ body{
     cursor: pointer;
 }
 
+  #btn4 {
+    height: 70px;
+    width: 500px;
+    border-radius: 5px;
+    border-radius: 1rem;
+    background-color: blue;
+    color: white;
+    border: none;
+    transition: background-color 0.3s ease;
+    gap: 20px;
+    font-size: 30px;
+    margin: 4px 2px;
+    cursor: pointer;
+  }
+
 
 #btn1:hover {
     background-color: green;
@@ -120,6 +134,10 @@ body{
 }
 #btn3:hover {
     background-color: green;
+}
+
+#btn4:hover {
+  background-color: green;
 }
 
 
@@ -137,10 +155,9 @@ footer {
 /* New template creation */
 
 .navbar2{
-    height: 200px;
     width: 100%;
-    background-color: black;
-    }
+    background-color: #003366;
+}
 .navbar2 img{
    height: auto;
    width: 100%;

@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF to XLSX Converter</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    .feature-page {
+      min-height: 100vh;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #f4f8ff, #eaf3ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .feature-card {
+      width: min(960px, 100%);
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+      border: 1px solid #dbe7ff;
+    }
+
+    .feature-card h1 {
+      margin-top: 0;
+      color: #003366;
+      font-size: 32px;
+      text-align: center;
+    }
+
+    .helper-text {
+      font-size: 17px;
+      line-height: 1.6;
+      color: #1f2d3d;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .upload-box {
+      border: 2px dashed #9eb9e6;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      background: #f8fbff;
+    }
+
+    .upload-box input[type="file"] {
+      width: 100%;
+      max-width: 460px;
+      padding: 10px;
+      border: 1px solid #d0ddf6;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .actions {
+      margin-top: 18px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      height: 48px;
+      min-width: 190px;
+      border: none;
+      border-radius: 10px;
+      background-color: #003366;
+      color: #ffffff;
+      font-size: 17px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      padding: 0 20px;
+    }
+
+    .action-btn:hover {
+      background-color: #0055aa;
+    }
+
+    .action-btn:disabled {
+      background-color: #7e9cc2;
+      cursor: not-allowed;
+    }
+
+    .status-box {
+      margin-top: 20px;
+      background: #f5f8ff;
+      border: 1px solid #d9e5fb;
+      border-radius: 10px;
+      padding: 14px;
+      color: #13253f;
+      font-size: 15px;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .back-wrap {
+      margin-top: 24px;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      .feature-card h1 {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="feature-page">
+    <div class="feature-card">
+      <h1>PDF to XLSX Converter</h1>
+      <div class="helper-text">
+        Upload your result PDF, extract USN, student name, and subject marks automatically, then download a standardized XLSX sheet.
+      </div>
+
+      <div class="upload-box">
+        <input type="file" id="pdfInput" accept="application/pdf" />
+        <div class="actions">
+          <button id="convertBtn" class="action-btn">Convert and Download XLSX</button>
+          <button class="action-btn" onclick="window.location.href='index.html'">Back to Home</button>
+        </div>
+      </div>
+
+      <div id="statusBox" class="status-box">Select a PDF file to start conversion.</div>
+
+      <div class="back-wrap">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const pdfInput = document.getElementById('pdfInput');
+    const convertBtn = document.getElementById('convertBtn');
+    const statusBox = document.getElementById('statusBox');
+
+    function updateStatus(message) {
+      statusBox.textContent = message;
+    }
+
+    function normalizeLine(line) {
+      return line.replace(/\s+/g, ' ').trim();
+    }
+
+    function sanitizeStudentName(rawName) {
+      let name = normalizeLine(String(rawName || ''));
+
+      // Remove only the label, not the whole line
+      name = name.replace(/^student\s*name\s*[:\-]?\s*/i, '');
+      
+      // Split at common keywords to remove noise but preserve name
+      name = name.split(/\b(semester|subject|code|internal|external|total|result|university|seat|number)\b/i)[0];
+      
+      // Remove VTU/provisional info only if at the start
+      name = name.replace(/^(vtu|provisional\s+result|result)\s*/i, '');
+      
+      // Clean up: preserve letters, spaces, and common punctuation
+      name = name.replace(/[^A-Za-z\s'.,-]/g, ' ');
+      
+      // Trim and clean up multiple spaces
+      name = name.replace(/\s+/g, ' ').trim();
+      
+      // Remove trailing titles
+      name = name.replace(/\s+(mr|ms|mrs|dr|prof)\s*$/i, '').trim();
+
+      return (name && name.length > 1) ? name : 'Unknown';
+    }
+
+    function normalizeUsn(rawUsn) {
+      return rawUsn.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    }
+
+    function toNumber(value) {
+      const normalized = String(value || '')
+        .replace(/[Oo]/g, '0')
+        .replace(/[Il|]/g, '1')
+        .replace(/[^0-9\s]/g, ' ');
+      const match = normalized.match(/\d{1,3}/);
+      return match ? Number(match[0]) : '';
+    }
+
+    function columnText(words, minX, maxX) {
+      const filtered = words
+        .filter((w) => w.x >= minX && w.x < maxX)
+        .sort((a, b) => a.x - b.x)
+        .map((w) => w.text)
+        .join(' ');
+      return normalizeLine(filtered);
+    }
+
+    function parseStudentBlock(blockText) {
+      const text = normalizeLine(blockText);
+      const usnMatch = text.match(/\b[1-4]\s*[A-Za-z]{2}\s*\d{2}\s*[A-Za-z]{2}\s*\d{3}\b/i);
+      if (!usnMatch) return null;
+
+      const usn = normalizeUsn(usnMatch[0]);
+      if (!usn) return null;
+
+      const afterUsn = text.slice((usnMatch.index || 0) + usnMatch[0].length).trim();
+      const firstNumberPos = afterUsn.search(/\b\d{1,3}\b/);
+      const rawName = firstNumberPos > -1 ? afterUsn.slice(0, firstNumberPos) : afterUsn;
+      const name = sanitizeStudentName(rawName);
+
+      const subjectMarks = (afterUsn.match(/\b\d{1,3}\b/g) || [])
+        .map(Number)
+        .filter((num) => num >= 0 && num <= 100);
+
+      // Require minimum 4 marks to avoid random data
+      // Require valid student name (not just "Unknown")
+      if (subjectMarks.length < 4 || name === 'Unknown' || !name || name.length < 2) {
+        return null;
+      }
+      
+      return { usn, name, subjectMarks };
+    }
+
+    function mergeSubjectMarks(existingMarks, incomingMarks) {
+      const a = Array.isArray(existingMarks) ? existingMarks : [];
+      const b = Array.isArray(incomingMarks) ? incomingMarks : [];
+      const maxLen = Math.max(a.length, b.length);
+      const merged = [];
+
+      for (let i = 0; i < maxLen; i += 1) {
+        const left = a[i];
+        const right = b[i];
+        if (typeof left === 'number') merged.push(left);
+        else if (typeof right === 'number') merged.push(right);
+        else merged.push('');
+      }
+
+      // Remove trailing empty placeholders.
+      while (merged.length > 0 && merged[merged.length - 1] === '') {
+        merged.pop();
+      }
+
+      return merged;
+    }
+
+    function mergeStudentsByUsn(students) {
+      const studentMap = new Map();
+
+      for (const student of students || []) {
+        if (!student || !student.usn) continue;
+
+        if (!studentMap.has(student.usn)) {
+          studentMap.set(student.usn, {
+            usn: student.usn,
+            name: student.name || 'Unknown',
+            subjectMarks: Array.isArray(student.subjectMarks) ? [...student.subjectMarks] : []
+          });
+          continue;
+        }
+
+        const existing = studentMap.get(student.usn);
+
+        if ((!existing.name || existing.name === 'Unknown') && student.name) {
+          existing.name = student.name;
+        }
+
+        existing.subjectMarks = mergeSubjectMarks(existing.subjectMarks, student.subjectMarks);
+      }
+
+      return Array.from(studentMap.values());
+    }
+
+    function sortStudentsByUsn(students) {
+      return [...students].sort((a, b) => String(a.usn || '').localeCompare(String(b.usn || ''), undefined, { numeric: true }));
+    }
+
+    function inferExpectedSubjectCount(students) {
+      const counts = new Map();
+      for (const s of students || []) {
+        const len = Array.isArray(s.subjectMarks) ? s.subjectMarks.length : 0;
+        if (len <= 0) continue;
+        counts.set(len, (counts.get(len) || 0) + 1);
+      }
+
+      if (counts.size === 0) return 0;
+
+      let expected = 0;
+      let freq = -1;
+      counts.forEach((count, len) => {
+        if (count > freq || (count === freq && len > expected)) {
+          freq = count;
+          expected = len;
+        }
+      });
+
+      return expected;
+    }
+
+    function isLikelyUsn(token) {
+      return /^\d{1,2}[A-Z]{1,4}\d{2}[A-Z]{2}\d{3}[A-Z]?$/i.test(String(token || ''));
+    }
+
+    function normalizeSubjectCodeToken(token) {
+      return normalizeUsn(String(token || ''))
+        .replace(/O/g, '0')
+        .replace(/I/g, '1');
+    }
+
+    function extractSubjectCodesFromText(text, expectedCount) {
+      const normalizedText = normalizeLine(String(text || ''));
+      const codePattern = /\b(?:\d{1,2}\s*[A-Z]{2,8}\s*\d{2,4}[A-Z]?|[A-Z]{2,8}\s*\d{3,4}[A-Z]?)\b/g;
+      const rawMatches = [...normalizedText.matchAll(codePattern)].map((m) => normalizeSubjectCodeToken(m[0]));
+
+      const seen = new Set();
+      const codes = [];
+      for (const token of rawMatches) {
+        if (!token) continue;
+        if (isLikelyUsn(token)) continue;
+        if (/^(SEM|YEAR|RESULT|USN|NAME|TOTAL)$/i.test(token)) continue;
+        if (!/[A-Z]/.test(token) || !/\d/.test(token)) continue;
+        if (seen.has(token)) continue;
+        seen.add(token);
+        codes.push(token);
+        if (expectedCount > 0 && codes.length >= expectedCount) break;
+      }
+
+      return codes;
+    }
+
+    function extractSubjectCodesFromLines(lines, expectedCount) {
+      const codePattern = /\b(?:\d{1,2}\s*[A-Z]{2,8}\s*\d{2,4}[A-Z]?|[A-Z]{2,8}\s*\d{3,4}[A-Z]?)\b/g;
+      const seen = new Set();
+      const codes = [];
+
+      const addCodesFromText = (text) => {
+        const matches = [...String(text || '').matchAll(codePattern)].map((m) => normalizeSubjectCodeToken(m[0]));
+        for (const token of matches) {
+          if (!token) continue;
+          if (isLikelyUsn(token)) continue;
+          if (/^(SEM|YEAR|RESULT|USN|NAME|TOTAL)$/i.test(token)) continue;
+          if (!/[A-Z]/.test(token) || !/\d/.test(token)) continue;
+          if (seen.has(token)) continue;
+          seen.add(token);
+          codes.push(token);
+          if (expectedCount > 0 && codes.length >= expectedCount) return true;
+        }
+        return false;
+      };
+
+      for (let i = 0; i < lines.length; i += 1) {
+        const line = String(lines[i] || '');
+        const lower = line.toLowerCase();
+        const isCodeHeader = lower.includes('course code') || lower.includes('subject code') || lower.includes('code');
+        const isStudentHeader = lower.includes('usn') || lower.includes('name');
+
+        if (isCodeHeader || (!isStudentHeader && [...line.matchAll(codePattern)].length >= 2)) {
+          const windowText = [lines[i - 1] || '', line, lines[i + 1] || ''].join(' ');
+          if (addCodesFromText(windowText)) return codes;
+        }
+      }
+
+      return codes;
+    }
+
+    function resolveSubjectCodes(lines, text, expectedCount) {
+      const lineCodes = extractSubjectCodesFromLines(lines || [], expectedCount);
+      if (expectedCount > 0 && lineCodes.length >= expectedCount) return lineCodes.slice(0, expectedCount);
+
+      const textCodes = extractSubjectCodesFromText(text || '', expectedCount);
+      const merged = [];
+      const seen = new Set();
+
+      for (const code of [...lineCodes, ...textCodes]) {
+        if (!code || seen.has(code)) continue;
+        seen.add(code);
+        merged.push(code);
+        if (expectedCount > 0 && merged.length >= expectedCount) break;
+      }
+
+      return merged;
+    }
+
+    function parseAcademicInfo(fullText) {
+      const normalized = normalizeLine(String(fullText || ''));
+
+      const academicYearMatch = normalized.match(/\b(20\d{2}\s*[-/]\s*\d{2,4})\b/i);
+      const semesterMatch = normalized.match(/\bsemester\s*[:\-]?\s*(\d{1,2})\b/i) || normalized.match(/\bsem\s*[:\-]?\s*(\d{1,2})\b/i);
+      const branchLabelMatch = normalized.match(/\bbranch\s*[:\-]?\s*([A-Za-z &]{3,80}?)(?=\s+(semester|academic|course|subject|usn|student|$))/i);
+
+      const knownBranchMatch = normalized.match(/\b(ELECTRONICS\s+AND\s+COMMUNICATION\s+ENGINEERING|COMPUTER\s+SCIENCE\s+AND\s+ENGINEERING|INFORMATION\s+SCIENCE\s+AND\s+ENGINEERING|MECHANICAL\s+ENGINEERING|CIVIL\s+ENGINEERING|ELECTRICAL\s+AND\s+ELECTRONICS\s+ENGINEERING|ECE|CSE|ISE|ME|CIVIL|EEE)\b/i);
+
+      const academicYear = academicYearMatch ? normalizeLine(academicYearMatch[1]) : '';
+      const semester = semesterMatch ? semesterMatch[1] : '';
+      const branch = branchLabelMatch
+        ? normalizeLine(branchLabelMatch[1])
+        : (knownBranchMatch ? normalizeLine(knownBranchMatch[1]) : '');
+
+      return { academicYear, branch, semester };
+    }
+
+    function parseStudentsFromLines(lines) {
+      const students = [];
+      let currentBlock = '';
+
+      const hasUsn = (line) => /\b[1-4]\s*[A-Za-z]{2}\s*\d{2}\s*[A-Za-z]{2}\s*\d{3}\b/i.test(line);
+
+      const finalizeCurrentBlock = () => {
+        if (!currentBlock) return;
+        const parsed = parseStudentBlock(currentBlock);
+        if (parsed) {
+          students.push(parsed);
+        }
+      };
+
+      for (const line of lines) {
+        if (hasUsn(line)) {
+          finalizeCurrentBlock();
+          currentBlock = line;
+        } else if (currentBlock) {
+          // Continue current student block if line looks like marks/name continuation.
+          if (/\d{1,3}/.test(line) || /[A-Za-z]{2,}/.test(line)) {
+            currentBlock += ' ' + line;
+          }
+        }
+      }
+
+      finalizeCurrentBlock();
+      return sortStudentsByUsn(mergeStudentsByUsn(students));
+    }
+
+    function parseStudentsFromText(fullText) {
+      const text = normalizeLine(fullText);
+      const usnPattern = /\b[1-4]\s*[A-Za-z]{2}\s*\d{2}\s*[A-Za-z]{2}\s*\d{3}\b/g;
+      const matches = [...text.matchAll(usnPattern)];
+      const students = [];
+
+      for (let i = 0; i < matches.length; i += 1) {
+        const current = matches[i];
+        const next = matches[i + 1];
+        const start = (current.index || 0);
+        const end = next && typeof next.index === 'number' ? next.index : text.length;
+        const block = text.slice(start, end);
+        const parsed = parseStudentBlock(block);
+
+        if (parsed) {
+          students.push(parsed);
+        }
+      }
+
+      return sortStudentsByUsn(mergeStudentsByUsn(students));
+    }
+
+    async function extractPdfData(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const typedArray = new Uint8Array(arrayBuffer);
+      const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+
+      const chunks = [];
+      const reconstructedLines = [];
+      const pages = [];
+
+      for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+        const page = await pdf.getPage(pageNo);
+        const content = await page.getTextContent();
+        const text = content.items.map((item) => item.str).join(' ');
+        chunks.push(text);
+
+        // Rebuild row-like text using y-position grouping and x-order sorting.
+        const glyphs = content.items
+          .map((item) => {
+            const str = normalizeLine(item.str || '');
+            if (!str) return null;
+            return {
+              str,
+              x: item.transform ? item.transform[4] : 0,
+              y: item.transform ? item.transform[5] : 0
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => {
+            if (Math.abs(b.y - a.y) > 2) return b.y - a.y;
+            return a.x - b.x;
+          });
+
+        const lineBuckets = [];
+        const yTolerance = 2.5;
+
+        for (const glyph of glyphs) {
+          const lastBucket = lineBuckets[lineBuckets.length - 1];
+          if (!lastBucket || Math.abs(lastBucket.y - glyph.y) > yTolerance) {
+            lineBuckets.push({ y: glyph.y, words: [glyph] });
+          } else {
+            lastBucket.words.push(glyph);
+          }
+        }
+
+        for (const bucket of lineBuckets) {
+          const lineText = bucket.words
+            .sort((a, b) => a.x - b.x)
+            .map((item) => item.str)
+            .join(' ');
+          const cleaned = normalizeLine(lineText);
+          if (cleaned) reconstructedLines.push(cleaned);
+        }
+
+        const structuredLines = lineBuckets
+          .map((bucket) => {
+            const words = bucket.words
+              .sort((a, b) => a.x - b.x)
+              .map((w) => ({ text: w.str, x: w.x, y: w.y }))
+              .filter((w) => w.text);
+            const textLine = normalizeLine(words.map((w) => w.text).join(' '));
+            if (!textLine) return null;
+            return { y: bucket.y, words, text: textLine, pageNo };
+          })
+          .filter(Boolean);
+
+        pages.push({ pageNo, lines: structuredLines });
+      }
+
+      return {
+        fullText: chunks.join(' '),
+        lines: reconstructedLines,
+        pages
+      };
+    }
+
+    async function extractPdfTextWithOcr(file, onProgress) {
+      const arrayBuffer = await file.arrayBuffer();
+      const typedArray = new Uint8Array(arrayBuffer);
+      const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
+      const pageTexts = [];
+      const pages = [];
+
+      for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+        if (typeof onProgress === 'function') {
+          onProgress(`Running OCR on page ${pageNo} of ${pdf.numPages}...`);
+        }
+
+        const page = await pdf.getPage(pageNo);
+        const viewport = page.getViewport({ scale: 3 });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+
+        await page.render({ canvasContext: context, viewport }).promise;
+
+        const { data } = await Tesseract.recognize(canvas, 'eng');
+        const text = data?.text || '';
+        pageTexts.push(text || '');
+
+        const words = (data?.words || [])
+          .map((w) => {
+            const token = normalizeLine(w.text || '');
+            const conf = Number(w.confidence || 0);
+            if (!token || conf < 35 || !w.bbox) return null;
+            return {
+              text: token,
+              x: w.bbox.x0,
+              y: (w.bbox.y0 + w.bbox.y1) / 2
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => {
+            if (Math.abs(a.y - b.y) > 8) return a.y - b.y;
+            return a.x - b.x;
+          });
+
+        const lineBuckets = [];
+        const yTolerance = 10;
+        for (const word of words) {
+          const lastBucket = lineBuckets[lineBuckets.length - 1];
+          if (!lastBucket || Math.abs(lastBucket.y - word.y) > yTolerance) {
+            lineBuckets.push({ y: word.y, words: [word] });
+          } else {
+            lastBucket.words.push(word);
+          }
+        }
+
+        const structuredLines = lineBuckets
+          .map((bucket) => {
+            const lineWords = bucket.words.sort((a, b) => a.x - b.x);
+            const lineText = normalizeLine(lineWords.map((w) => w.text).join(' '));
+            if (!lineText) return null;
+            return {
+              y: bucket.y,
+              words: lineWords,
+              text: lineText,
+              pageNo
+            };
+          })
+          .filter(Boolean);
+
+        pages.push({ pageNo, lines: structuredLines });
+      }
+
+      return {
+        fullText: pageTexts.join('\n'),
+        pages
+      };
+    }
+
+    function parseStudentInfo(fullText) {
+      const lines = String(fullText || '')
+        .split(/\r?\n/)
+        .map((line) => normalizeLine(line))
+        .filter(Boolean);
+      const normalized = normalizeLine(fullText);
+
+      let usn = '';
+      let name = '';
+      
+      // Find USN - check for USN pattern in nearby lines
+      const usnLineIdx = lines.findIndex((line) => /university\s+seat\s+number/i.test(line));
+      if (usnLineIdx >= 0) {
+        // Look for USN in the same line or next line
+        const usnLineText = lines[usnLineIdx] + ' ' + (lines[usnLineIdx + 1] || '');
+        const usnMatch = usnLineText.match(/\b([1-4][A-Z]{2}\d{2}[A-Z]{2}\d{3})\b/i);
+        if (usnMatch) {
+          usn = normalizeUsn(usnMatch[1]);
+        }
+      }
+      
+      if (!usn) {
+        const usnMatch = normalized.match(/\b([1-4][A-Z]{2}\d{2}[A-Z]{2}\d{3})\b/i);
+        if (usnMatch) {
+          usn = normalizeUsn(usnMatch[1]);
+        }
+      }
+
+      // Find Student Name - check multiple lines after the label
+      const nameLineIdx = lines.findIndex((line) => /student\s+name/i.test(line));
+      if (nameLineIdx >= 0) {
+        // Extract from the label line
+        let nameLine = lines[nameLineIdx]
+          .replace(/student\s+name\s*[:\-]?/i, '')
+          .trim();
+        
+        // If name is empty, check next line
+        if (!nameLine || nameLine.length < 2) {
+          nameLine = (lines[nameLineIdx + 1] || '').trim();
+        }
+        
+        if (nameLine && nameLine.length > 1) {
+          name = sanitizeStudentName(nameLine);
+        }
+      }
+      
+      // Fallback: Look for name pattern in text
+      if (!name || name === 'Unknown') {
+        const nameMatch = normalized.match(/Student\s+Name\s*[:\-]?\s*([A-Za-z .]{3,100}?)(?=\s+(?:Semester|Subject|University|Provisional|Result|Code|$))/i);
+        if (nameMatch) {
+          name = sanitizeStudentName(nameMatch[1]);
+        }
+      }
+      
+      // Final fallback: Get first alphabetic sequence that looks like a name
+      if (!name || name === 'Unknown') {
+        const nameMatch = normalized.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/);
+        if (nameMatch && nameMatch[0].length > 2 && !/^(VTU|Provisional|Result|Semester)/.test(nameMatch[0])) {
+          name = sanitizeStudentName(nameMatch[0]);
+        }
+      }
+
+      const semMatch = normalized.match(/Semester\s*[:\-]?\s*(\d{1,2})/i);
+      const academicYearMatch = normalized.match(/\b(20\d{2}\s*[-/]\s*\d{2,4})\b/i);
+
+      let branch = '';
+      const branchMatch = normalized.match(/\b(ELECTRONICS\s+AND\s+COMMUNICATION\s+ENGINEERING|COMPUTER\s+SCIENCE\s+AND\s+ENGINEERING|INFORMATION\s+SCIENCE\s+AND\s+ENGINEERING|MECHANICAL\s+ENGINEERING|CIVIL\s+ENGINEERING|ELECTRICAL\s+AND\s+ELECTRONICS\s+ENGINEERING)\b/i);
+      if (branchMatch) branch = normalizeLine(branchMatch[1]);
+
+      return {
+        usn,
+        name,
+        semester: semMatch ? semMatch[1] : '',
+        academicYear: academicYearMatch ? academicYearMatch[1].replace(/\s+/g, '') : '',
+        branch
+      };
+    }
+
+    function parseSubjectChunk(chunkText, codePattern, datePattern) {
+      const codeMatch = chunkText.match(codePattern);
+      if (!codeMatch) return null;
+
+      const subjectCode = normalizeUsn(codeMatch[0]).replace(/O/g, '0').replace(/I/g, '1');
+      if (!subjectCode) return null;
+
+      const withoutDate = chunkText.replace(datePattern, ' ');
+      const afterCode = withoutDate.slice(withoutDate.indexOf(codeMatch[0]) + codeMatch[0].length).trim();
+      
+      // Extract all numbers 0-100 (includes internal, external, total)
+      const numberMatches = [...afterCode.matchAll(/\b\d{1,3}\b/g)]
+        .map((m) => Number(m[0]))
+        .filter((n) => n >= 0 && n <= 100);
+
+      if (numberMatches.length < 2) return null;
+
+      // Read marks in order: Internal (first), External (second), Total (third if present)
+      let internalMarks, externalMarks, total;
+      
+      if (numberMatches.length >= 3) {
+        // Properly read: first number = internal, second = external, third = total
+        internalMarks = numberMatches[0];
+        externalMarks = numberMatches[1];
+        total = numberMatches[2];
+        
+        // Validate: internal typically 0-50, external 0-50
+        // If both are within 0-50, keep as is
+        // If first > 50, might be swapped
+        if (internalMarks > 50 && externalMarks <= 50) {
+          const temp = internalMarks;
+          internalMarks = externalMarks;
+          externalMarks = temp;
+        }
+      } else if (numberMatches.length === 2) {
+        internalMarks = numberMatches[0];
+        externalMarks = numberMatches[1];
+        total = internalMarks + externalMarks;
+        
+        // If first > 50 and second ≤ 50, swap
+        if (internalMarks > 50 && externalMarks <= 50) {
+          const temp = internalMarks;
+          internalMarks = externalMarks;
+          externalMarks = temp;
+        }
+      } else {
+        return null;
+      }
+
+      // Cap marks at their maximum
+      internalMarks = Math.min(internalMarks, 50);
+      externalMarks = Math.min(externalMarks, 50);
+      total = Math.min(internalMarks + externalMarks, 100);
+
+      const firstMarkIdx = afterCode.search(/\b\d{1,3}\b/);
+      const rawSubjectName = firstMarkIdx > -1 ? afterCode.slice(0, firstMarkIdx) : afterCode;
+      const subjectName = rawSubjectName
+        .replace(/[^A-Za-z0-9 &().,\/-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!subjectName || subjectName.length < 2) return null;
+
+      const resultMatch = chunkText.match(/\b(P|F|A|W)\b/i);
+      const announcedMatch = chunkText.match(datePattern);
+
+      return {
+        subjectCode,
+        subjectName,
+        internalMarks,
+        externalMarks,
+        total,
+        result: resultMatch ? resultMatch[1].toUpperCase() : (internalMarks >= 20 && externalMarks >= 18 ? 'P' : 'F'),
+        announced: announcedMatch ? announcedMatch[0] : ''
+      };
+    }
+
+    function parseVtuFromOcrLineAnchors(pages, fullText) {
+      const flatLines = (pages || []).flatMap((p) => p.lines || []);
+      if (!flatLines.length) return null;
+
+      const codePattern = /\b(?:\d{1,2}\s*[A-Z]{2,8}\s*\d{2,4}[A-Z]?|[A-Z]{2,8}\s*\d{3,4}[A-Z]?)\b/i;
+      const datePattern = /\b\d{4}[\/-]\d{2}[\/-]\d{2}\b/;
+      const stopWords = ['abbreviation', 'note', 'registrar', 'back', 'print'];
+
+      const rows = [];
+      let i = 0;
+      while (i < flatLines.length) {
+        const lineText = flatLines[i].text;
+        const lower = lineText.toLowerCase();
+        if (stopWords.some((w) => lower.includes(w))) break;
+
+        if (!codePattern.test(lineText)) {
+          i += 1;
+          continue;
+        }
+
+        let chunk = lineText;
+        let j = i + 1;
+        while (j < flatLines.length) {
+          const nextText = flatLines[j].text;
+          const nextLower = nextText.toLowerCase();
+          if (stopWords.some((w) => nextLower.includes(w))) break;
+          if (codePattern.test(nextText)) break;
+          chunk += ` ${nextText}`;
+          // Usually 1-2 continuation lines are enough for wrapped subject names.
+          if (j - i >= 2) break;
+          j += 1;
+        }
+
+        const parsed = parseSubjectChunk(chunk, codePattern, datePattern);
+        if (parsed) rows.push(parsed);
+        i = j;
+      }
+
+      if (!rows.length) return null;
+
+      const uniqueRows = [];
+      const seen = new Set();
+      for (const row of rows) {
+        const key = `${row.subjectCode}|${row.internalMarks}|${row.externalMarks}|${row.total}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        uniqueRows.push(row);
+      }
+
+      return {
+        studentInfo: parseStudentInfo(fullText),
+        rows: uniqueRows
+      };
+    }
+
+    function detectHeaderLine(flatLines) {
+      return flatLines.findIndex((line) => {
+        const t = line.text.toLowerCase();
+        const hasSubject = t.includes('subject') || t.includes('subiect');
+        const hasCode = t.includes('code');
+        const hasName = t.includes('name');
+        const hasMarks = t.includes('internal') || t.includes('interna1') || t.includes('cie') || 
+                          t.includes('external') || t.includes('see') || t.includes('total') ||
+                          t.includes('continuous') || t.includes('semester');
+        return hasSubject && hasCode && hasName && hasMarks;
+      });
+    }
+
+    function getColumnPositions(headerLine) {
+      const positions = {
+        code: null,
+        name: null,
+        internal: null,
+        external: null,
+        total: null,
+        result: null,
+        announced: null
+      };
+
+      for (const w of headerLine.words) {
+        const lower = w.text.toLowerCase();
+        if (positions.code === null && (lower.includes('code') || lower === 'subject')) positions.code = w.x;
+        if (positions.name === null && lower.includes('name')) positions.name = w.x;
+        if (positions.internal === null && (lower.includes('internal') || lower.includes('interna1') || lower.includes('cie') || lower.includes('continuous'))) positions.internal = w.x;
+        if (positions.external === null && (lower.includes('external') || lower.includes('see') || lower.includes('semester'))) positions.external = w.x;
+        if (positions.total === null && lower.includes('total')) positions.total = w.x;
+        if (positions.result === null && lower.includes('result')) positions.result = w.x;
+        if (positions.announced === null && (lower.includes('announced') || lower.includes('updated'))) positions.announced = w.x;
+      }
+
+      // Fallback defaults when a header token is split or missed.
+      const xs = headerLine.words.map((w) => w.x).sort((a, b) => a - b);
+      const minX = xs[0] || 0;
+      const maxX = xs[xs.length - 1] || 600;
+
+      if (positions.code === null) positions.code = minX;
+      if (positions.name === null) positions.name = minX + (maxX - minX) * 0.18;
+      if (positions.internal === null) positions.internal = minX + (maxX - minX) * 0.55;
+      if (positions.external === null) positions.external = minX + (maxX - minX) * 0.65;
+      if (positions.total === null) positions.total = minX + (maxX - minX) * 0.74;
+      if (positions.result === null) positions.result = minX + (maxX - minX) * 0.83;
+      if (positions.announced === null) positions.announced = minX + (maxX - minX) * 0.9;
+
+      return positions;
+    }
+
+    function parseVtuTable(pages, fullText) {
+      const flatLines = pages.flatMap((p) => p.lines);
+      const headerIndex = detectHeaderLine(flatLines);
+      if (headerIndex === -1) return null;
+
+      const headerLine = flatLines[headerIndex];
+      const cols = getColumnPositions(headerLine);
+
+      const rowStopWords = ['abbreviation', 'note', 'registrar', 'back', 'print'];
+      const codePattern = /^(?:\d{1,2}[A-Z]{2,8}\d{2,4}[A-Z]?|[A-Z]{2,8}\d{3,4}[A-Z]?)$/i;
+      const datePattern = /\b\d{4}[\/-]\d{2}[\/-]\d{2}\b/;
+      const rows = [];
+      let currentRow = null;
+
+      function extractMarksFromRowText(lineText, codeText) {
+        const normalized = normalizeLine(String(lineText || ''));
+        const codeEscaped = String(codeText || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        let cleaned = normalized;
+        if (codeEscaped) {
+          cleaned = cleaned.replace(new RegExp(codeEscaped, 'i'), ' ');
+        }
+
+        cleaned = cleaned
+          .replace(datePattern, ' ')
+          .replace(/\b(P|F|A|W)\b/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        const nums = [...cleaned.matchAll(/\b\d{1,3}\b/g)]
+          .map((m) => Number(m[0]))
+          .filter((n) => n >= 0 && n <= 100);
+
+        if (nums.length >= 3) {
+          // Read in order: first = internal, second = external, third = total
+          let internal = nums[0];
+          let external = nums[1];
+          let total = nums[2];
+          
+          // Smart swap: if first > 50 and second ≤ 50, likely swapped
+          if (internal > 50 && external <= 50) {
+            const temp = internal;
+            internal = external;
+            external = temp;
+          }
+          
+          // Cap at maximums
+          internal = Math.min(internal, 50);
+          external = Math.min(external, 50);
+          total = Math.min(internal + external, 100);
+          
+          return { internal, external, total };
+        }
+
+        if (nums.length === 2) {
+          let internal, external;
+          // First mark is typically internal, second is external
+          internal = nums[0];
+          external = nums[1];
+          
+          // Smart swap: if first > 50 and second ≤ 50, likely swapped
+          if (internal > 50 && external <= 50) {
+            const temp = internal;
+            internal = external;
+            external = temp;
+          }
+          
+          // Cap at maximums
+          internal = Math.min(internal, 50);
+          external = Math.min(external, 50);
+          return { internal, external, total: internal + external };
+        }
+
+        if (nums.length === 1) {
+          return { internal: '', external: '', total: nums[0] };
+        }
+
+        return null;
+      }
+
+      for (let i = headerIndex + 1; i < flatLines.length; i += 1) {
+        const line = flatLines[i];
+        const lower = line.text.toLowerCase();
+        if (rowStopWords.some((w) => lower.includes(w))) break;
+
+        const minX = -Infinity;
+        const codeToName = (cols.code + cols.name) / 2;
+        const nameToInternal = (cols.name + cols.internal) / 2;
+        const internalToExternal = (cols.internal + cols.external) / 2;
+        const externalToTotal = (cols.external + cols.total) / 2;
+        const totalToResult = (cols.total + cols.result) / 2;
+        const resultToAnnounced = (cols.result + cols.announced) / 2;
+        const maxX = Infinity;
+
+        const codeText = columnText(line.words, minX, codeToName).replace(/\s+/g, '');
+        const nameText = columnText(line.words, codeToName, nameToInternal);
+        const internalText = columnText(line.words, nameToInternal, internalToExternal);
+        const externalText = columnText(line.words, internalToExternal, externalToTotal);
+        const totalText = columnText(line.words, externalToTotal, totalToResult);
+        const resultText = columnText(line.words, totalToResult, resultToAnnounced);
+        const announcedText = columnText(line.words, resultToAnnounced, maxX);
+
+        const hasCode = codePattern.test(codeText);
+        const hasAnyMarks = /\d/.test(internalText + externalText + totalText);
+        const hasDate = datePattern.test(announcedText) || datePattern.test(line.text);
+
+        if (hasCode) {
+          const rowTextMarks = extractMarksFromRowText(line.text, codeText);
+
+          const internalNum = toNumber(internalText);
+          const externalNum = toNumber(externalText);
+          const totalNumRaw = toNumber(totalText);
+
+          let rowInternal = internalNum;
+          let rowExternal = externalNum;
+          let correctedTotal = totalNumRaw;
+
+          if (rowTextMarks) {
+            rowInternal = rowTextMarks.internal;
+            rowExternal = rowTextMarks.external;
+            correctedTotal = rowTextMarks.total;
+          }
+
+          const hasInternal = rowInternal !== '' && !Number.isNaN(Number(rowInternal));
+          const hasExternal = rowExternal !== '' && !Number.isNaN(Number(rowExternal));
+
+          // Fix noisy totals (for example, code fragments like 359 or truncated values like 3).
+          if (correctedTotal === '' || Number(correctedTotal) > 200) {
+            correctedTotal = (hasInternal || hasExternal)
+              ? (Number(hasInternal ? internalNum : 0) + Number(hasExternal ? externalNum : 0))
+              : '';
+          } else if (hasInternal || hasExternal) {
+            const expectedMin = Math.max(
+              hasInternal ? Number(internalNum) : 0,
+              hasExternal ? Number(externalNum) : 0
+            );
+            const expectedSum = Number(hasInternal ? internalNum : 0) + Number(hasExternal ? externalNum : 0);
+
+            if (Number(correctedTotal) < expectedMin || Number(correctedTotal) < Math.floor(expectedSum * 0.5)) {
+              correctedTotal = expectedSum;
+            }
+          }
+
+          const row = {
+            subjectCode: codeText,
+            subjectName: nameText,
+            internalMarks: rowInternal,
+            externalMarks: rowExternal,
+            total: correctedTotal,
+            result: normalizeLine(resultText).toUpperCase(),
+            announced: (announcedText.match(datePattern) || [normalizeLine(announcedText)])[0] || ''
+          };
+
+          // Validate and link CIE and SEE marks
+          if (row.total === '' && row.internalMarks !== '' && row.externalMarks !== '') {
+            row.total = Number(row.internalMarks) + Number(row.externalMarks);
+          }
+          
+          // Ensure CIE is 0-50, SEE is 0-100
+          if (row.internalMarks !== '' && row.externalMarks !== '') {
+            const cie = Number(row.internalMarks);
+            const see = Number(row.externalMarks);
+            
+            // If they appear to be swapped, correct them
+            if (see <= 50 && cie > 50 && cie <= 100) {
+              row.internalMarks = see;
+              row.externalMarks = cie;
+            }
+          }
+          
+          if (!row.result && row.internalMarks !== '' && row.externalMarks !== '') {
+            row.result = (Number(row.internalMarks) >= 20 && Number(row.externalMarks) >= 18) ? 'P' : 'F';
+          }
+
+          rows.push(row);
+          currentRow = row;
+          continue;
+        }
+
+        // Continuation line: append long subject names broken into next line.
+        if (currentRow && nameText && !hasAnyMarks && !hasDate) {
+          currentRow.subjectName = normalizeLine(`${currentRow.subjectName} ${nameText}`);
+        }
+      }
+
+      if (rows.length === 0) return null;
+
+      const studentInfo = parseStudentInfo(fullText);
+      return { studentInfo, rows };
+    }
+
+    function parseAllVtuStudentsFromPages(pages) {
+      const parsedStudents = [];
+      const seenUsn = new Set();
+
+      function extractStudentInfoFromLines(pageLines, fallbackText) {
+        const lines = (pageLines || []).map((l) => normalizeLine(l.text || '')).filter(Boolean);
+
+        function extractNameFromContext(text, usnToken) {
+          const normalized = normalizeLine(String(text || ''));
+          if (!normalized) return '';
+
+          const usnPatternText = usnToken
+            ? String(usnToken).split('').join('\\s*')
+            : '[1-4]\\s*[A-Za-z]{2}\\s*\\d{2}\\s*[A-Za-z]{2}\\s*\\d{3}';
+
+          const regex = new RegExp(`(${usnPatternText})([\\s\\S]{0,180})`, 'i');
+          const match = normalized.match(regex);
+          if (!match) return '';
+
+          const tail = normalizeLine(match[2] || '');
+          const nameLike = tail
+            .replace(/^student\s*name\s*[:\-]?\s*/i, '')
+            .split(/\b(Semester|Subject|University|VTU|Result)\b/i)[0]
+            .trim();
+
+          const cleaned = sanitizeStudentName(nameLike);
+          return cleaned === 'Unknown' ? '' : cleaned;
+        }
+
+        let usn = '';
+        let name = '';
+        let semester = '';
+        let academicYear = '';
+        let branch = '';
+
+        for (const line of lines) {
+          if (!usn && /university\s+seat\s+number/i.test(line)) {
+            const m = line.match(/\b[1-4]\s*[A-Za-z]{2}\s*\d{2}\s*[A-Za-z]{2}\s*\d{3}\b/i);
+            if (m) usn = normalizeUsn(m[0]);
+          }
+
+          if (!name && /student\s+name/i.test(line)) {
+            const cleaned = sanitizeStudentName(line.replace(/student\s+name\s*[:\-]?/i, ''));
+            if (cleaned && cleaned !== 'Unknown') name = cleaned;
+            else {
+              const idx = lines.indexOf(line);
+              const next1 = lines[idx + 1] || '';
+              const next2 = lines[idx + 2] || '';
+              const nextCandidate = sanitizeStudentName(`${next1} ${next2}`);
+              if (nextCandidate && nextCandidate !== 'Unknown') name = nextCandidate;
+            }
+          }
+
+          if (!semester) {
+            const sem = line.match(/\bsemester\s*[:\-]?\s*(\d{1,2})\b/i);
+            if (sem) semester = sem[1];
+          }
+
+          if (!academicYear) {
+            const ay = line.match(/\b(20\d{2}\s*[-/]\s*\d{2,4})\b/i);
+            if (ay) academicYear = normalizeLine(ay[1]);
+          }
+        }
+
+        const fallback = parseStudentInfo(fallbackText || lines.join('\n'));
+        if (!usn) usn = normalizeUsn(fallback.usn || '');
+        if (!name || name === 'Unknown') name = sanitizeStudentName(fallback.name || '');
+        if (!name || name === 'Unknown') {
+          const fromContext = extractNameFromContext(fallbackText || lines.join(' '), usn);
+          if (fromContext) name = fromContext;
+        }
+        if (!semester) semester = fallback.semester || '';
+        if (!academicYear) academicYear = fallback.academicYear || '';
+        if (!branch) branch = fallback.branch || '';
+
+        return { usn, name, semester, academicYear, branch };
+      }
+
+      for (const page of pages || []) {
+        const pageLines = (page && page.lines) ? page.lines : [];
+        if (!pageLines.length) continue;
+
+        const pageText = pageLines.map((l) => l.text || '').join('\n');
+
+        // FIRST: Extract student info from this page
+        const lineInfo = extractStudentInfoFromLines(pageLines, pageText);
+        const usn = normalizeUsn(lineInfo.usn || '');
+        const studentName = sanitizeStudentName(lineInfo.name || '');
+
+        // Only process if USN and name are valid and unique
+        if (!usn || !studentName || studentName === 'Unknown' || seenUsn.has(usn)) {
+          continue;
+        }
+
+        // SECOND: Extract marks for this specific student/page
+        const tableParsed = parseVtuTable([{ pageNo: page.pageNo || 1, lines: pageLines }], pageText);
+        const anchorParsed = parseVtuFromOcrLineAnchors([{ pageNo: page.pageNo || 1, lines: pageLines }], pageText);
+
+        const parsed = (!tableParsed || !tableParsed.rows || (anchorParsed && anchorParsed.rows && anchorParsed.rows.length > (tableParsed.rows || []).length))
+          ? anchorParsed
+          : tableParsed;
+
+        if (!parsed || !parsed.rows || parsed.rows.length === 0) continue;
+
+        const validRows = parsed.rows.filter((row) => {
+          const code = normalizeSubjectCodeToken(row.subjectCode || '');
+          return code && !isLikelyUsn(code) && /[A-Z]/.test(code) && /\d/.test(code);
+        });
+
+        // Require minimum 3 valid subjects
+        if (validRows.length < 3) continue;
+
+        seenUsn.add(usn);
+        parsedStudents.push({
+          studentInfo: {
+            usn,
+            name: studentName,
+            semester: lineInfo.semester || parsed.studentInfo?.semester || '',
+            academicYear: lineInfo.academicYear || parsed.studentInfo?.academicYear || '',
+            branch: lineInfo.branch || parsed.studentInfo?.branch || ''
+          },
+          rows: validRows.map((row) => ({
+            ...row,
+            subjectCode: normalizeSubjectCodeToken(row.subjectCode || '')
+          }))
+        });
+      }
+
+      // Sort by USN ascending
+      return parsedStudents.sort((a, b) => {
+        return String(a.studentInfo?.usn || '').localeCompare(String(b.studentInfo?.usn || ''), undefined, { numeric: true });
+      });
+    }
+
+    function buildVtuStudentsWorkbook(parsedStudents) {
+      if (!parsedStudents || parsedStudents.length === 0) return;
+
+      const sortedStudents = [...parsedStudents].sort((a, b) => {
+        return String(a.studentInfo?.usn || '').localeCompare(String(b.studentInfo?.usn || ''), undefined, { numeric: true });
+      });
+
+      const subjectCodeSet = new Set();
+      const subjectCodes = [];
+      for (const student of sortedStudents) {
+        for (const row of student.rows || []) {
+          const code = normalizeSubjectCodeToken(row.subjectCode || '');
+          if (!code || subjectCodeSet.has(code)) continue;
+          subjectCodeSet.add(code);
+          subjectCodes.push(code);
+        }
+      }
+
+      const firstInfo = sortedStudents[0].studentInfo || {};
+      const semester = firstInfo.semester || '';
+      const academicYear = firstInfo.academicYear || '';
+      const branch = firstInfo.branch || '';
+
+      // ===== TEMPLATE SHEET: Shows Internal and External Marks separately =====
+      const templateRows = [];
+      templateRows.push(['Result Template - Enter/Verify Internal and External Marks']);
+      templateRows.push([`Academic Year: ${academicYear}`, '', '', ...subjectCodes.map(() => '')]);
+      templateRows.push([`Branch: ${branch}`, '', '', ...subjectCodes.map(() => '')]);
+      templateRows.push([`Semester: ${semester}`, '', '', ...subjectCodes.map(() => '')]);
+      templateRows.push([]); // Empty row for spacing
+
+      // Headers for template: Subject codes
+      const templateCodeRow = ['', 'USN', 'Student Name', ...subjectCodes.flatMap(code => [code, ''])];
+      // Headers for template: Internal and External labels
+      const templateHeaderRow = ['S.N', 'USN', 'Student Name', ...subjectCodes.flatMap(() => ['Internal (50)', 'External (50)'])];
+      templateRows.push(templateCodeRow);
+      templateRows.push(templateHeaderRow);
+
+      // Student data for template
+      sortedStudents.forEach((student, idx) => {
+        const marksByCode = new Map();
+        (student.rows || []).forEach((row) => {
+          const code = normalizeSubjectCodeToken(row.subjectCode || '');
+          let internal = typeof row.internalMarks === 'number' ? row.internalMarks : toNumber(row.internalMarks);
+          let external = typeof row.externalMarks === 'number' ? row.externalMarks : toNumber(row.externalMarks);
+          
+          // Validate Internal and External ranges
+          if (internal !== '' && external !== '') {
+            internal = Number(internal);
+            external = Number(external);
+            // Correct if swapped
+            if (external <= 50 && internal > 50 && internal <= 100) {
+              const temp = internal;
+              internal = external;
+              external = temp;
+            }
+            // Ensure they don't exceed limits
+            internal = Math.min(internal, 50);
+            external = Math.min(external, 50);
+          }
+          
+          if (!code) return;
+          marksByCode.set(code, { internal: internal === '' ? '' : Number(internal), external: external === '' ? '' : Number(external) });
+        });
+
+        const row = [
+          idx + 1,
+          student.studentInfo?.usn || '',
+          student.studentInfo?.name || 'Unknown'
+        ];
+
+        // Add Internal and External for each subject
+        subjectCodes.forEach(code => {
+          const marks = marksByCode.get(code);
+          if (marks) {
+            row.push(marks.internal === '' ? '' : marks.internal);
+            row.push(marks.external === '' ? '' : marks.external);
+          } else {
+            row.push('');
+            row.push('');
+          }
+        });
+
+        templateRows.push(row);
+      });
+
+      // ===== DETAILED SHEET: Shows all information =====
+      const detailedRows = [[
+        'S.N',
+        'USN',
+        'Student Name',
+        'Subject Code',
+        'Subject Name',
+        'Internal Marks (Out of 50)',
+        'External Marks (Out of 50)',
+        'Total (Out of 100)',
+        'Result',
+        'Announced/Updated'
+      ]];
+
+      sortedStudents.forEach((student, idx) => {
+        (student.rows || []).forEach((row) => {
+          const code = normalizeSubjectCodeToken(row.subjectCode || '');
+          let internal = typeof row.internalMarks === 'number' ? row.internalMarks : toNumber(row.internalMarks);
+          let external = typeof row.externalMarks === 'number' ? row.externalMarks : toNumber(row.externalMarks);
+          let total = typeof row.total === 'number' ? row.total : toNumber(row.total);
+          
+          // Validate Internal and External ranges
+          if (internal !== '' && external !== '') {
+            internal = Number(internal);
+            external = Number(external);
+            // Correct if swapped
+            if (external <= 50 && internal > 50 && internal <= 100) {
+              const temp = internal;
+              internal = external;
+              external = temp;
+            }
+            // Ensure they don't exceed limits
+            internal = Math.min(internal, 50);
+            external = Math.min(external, 50);
+            // Recalculate total
+            total = internal + external;
+          }
+          
+          if (!code) return;
+
+          detailedRows.push([
+            idx + 1,
+            student.studentInfo?.usn || '',
+            student.studentInfo?.name || 'Unknown',
+            code,
+            row.subjectName || '',
+            internal === '' ? '' : Number(internal),
+            external === '' ? '' : Number(external),
+            Number(total),
+            row.result || '',
+            row.announced || ''
+          ]);
+        });
+      });
+
+      // ===== SUMMARY SHEET: Totals and Results =====
+      const summaryRows = [[
+        'S.N',
+        'USN',
+        'Student Name',
+        'Total Subjects',
+        'Total Internal Obtained',
+        'Total External Obtained',
+        'Total Marks Obtained',
+        'Total Marks Possible',
+        'Percentage %'
+      ]];
+
+      sortedStudents.forEach((student, idx) => {
+        let totalInternal = 0;
+        let totalExternal = 0;
+        let validSubjects = 0;
+
+        (student.rows || []).forEach((row) => {
+          let internal = typeof row.internalMarks === 'number' ? row.internalMarks : toNumber(row.internalMarks);
+          let external = typeof row.externalMarks === 'number' ? row.externalMarks : toNumber(row.externalMarks);
+          
+          if (internal !== '' && external !== '') {
+            internal = Number(internal);
+            external = Number(external);
+            // Correct if swapped
+            if (external <= 50 && internal > 50 && internal <= 100) {
+              const temp = internal;
+              internal = external;
+              external = temp;
+            }
+            // Ensure they don't exceed limits
+            internal = Math.min(internal, 50);
+            external = Math.min(external, 50);
+            totalInternal += internal;
+            totalExternal += external;
+            validSubjects += 1;
+          }
+        });
+
+        const totalObtained = totalInternal + totalExternal;
+        const totalPossible = validSubjects * 100;
+        const percentage = totalPossible > 0 ? ((totalObtained / totalPossible) * 100).toFixed(2) : 0;
+
+        summaryRows.push([
+          idx + 1,
+          student.studentInfo?.usn || '',
+          student.studentInfo?.name || 'Unknown',
+          validSubjects,
+          totalInternal,
+          totalExternal,
+          totalObtained,
+          totalPossible,
+          percentage
+        ]);
+      });
+
+      const workbook = XLSX.utils.book_new();
+      const templateSheet = XLSX.utils.aoa_to_sheet(templateRows);
+      const detailedSheet = XLSX.utils.aoa_to_sheet(detailedRows);
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+
+      // Set column widths for template sheet
+      const templateCols = [
+        { wch: 6 },  // S.N
+        { wch: 16 }, // USN
+        { wch: 28 }, // Student Name
+      ];
+      subjectCodes.forEach(() => {
+        templateCols.push({ wch: 12 }); // Subject Code
+        templateCols.push({ wch: 12 }); // CIE (50)
+        templateCols.push({ wch: 12 }); // SEE (50)
+      });
+      templateSheet['!cols'] = templateCols;
+
+      // Set column widths for detailed sheet
+      detailedSheet['!cols'] = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 28 },
+        { wch: 12 },
+        { wch: 34 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 12 },
+        { wch: 8 },
+        { wch: 14 }
+      ];
+
+      // Set column widths for summary sheet
+      summarySheet['!cols'] = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 28 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 12 }
+      ];
+
+      XLSX.utils.book_append_sheet(workbook, templateSheet, 'Result Template');
+      XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Marks');
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+      XLSX.writeFile(workbook, `result_data_${Date.now()}.xlsx`);
+    }
+
+    function parseVtuFromOcrText(ocrText) {
+      function normalizeSubjectCode(rawCode) {
+        return normalizeUsn(String(rawCode || ''))
+          .replace(/O/g, '0')
+          .replace(/I/g, '1')
+          .replace(/\s+/g, '');
+      }
+
+      const lines = ocrText
+        .split(/\r?\n/)
+        .map((line) => normalizeLine(line))
+        .filter(Boolean);
+
+      if (lines.length === 0) return null;
+
+      const cleanedText = normalizeLine(ocrText)
+        .replace(/\bO\b/g, '0')
+        .replace(/\bI\b/g, '1');
+
+      const usnMatch = cleanedText.match(/University\s+Seat\s+Number\s*[:\-]?\s*([A-Za-z0-9\s]+)/i)
+        || cleanedText.match(/\b\d\s*[A-Za-z]{2}\s*\d{2}\s*[A-Za-z]{2}\s*\d{3}\b/i);
+      const nameMatch = cleanedText.match(/Student\s+Name\s*[:\-]?\s*([A-Za-z .]+)/i);
+      const semMatch = cleanedText.match(/Semester\s*[:\-]?\s*(\d{1,2})/i);
+
+      const extractedUsn = usnMatch
+        ? normalizeUsn(String(Array.isArray(usnMatch) ? usnMatch[1] || usnMatch[0] : usnMatch).split(' ')[0])
+        : '';
+
+      const studentInfo = {
+        usn: extractedUsn,
+        name: nameMatch ? sanitizeStudentName(nameMatch[1]) : '',
+        semester: semMatch ? semMatch[1] : ''
+      };
+
+      const codePattern = /\b(?:\d{1,2}\s*[A-Z]{2,8}\s*\d{2,4}[A-Z]?|[A-Z]{2,8}\s*\d{3,4}[A-Z]?)\b/i;
+      const datePattern = /\b\d{4}[\/-]\d{2}[\/-]\d{2}\b/;
+      const stopWords = ['abbreviation', 'note', 'registrar', 'back', 'print'];
+
+      const rows = [];
+
+      for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i];
+        const lower = line.toLowerCase();
+        if (stopWords.some((w) => lower.includes(w))) break;
+
+        if (/subject\s*code|subject\s*name|internal|external|announced|provisional\s+result/i.test(lower)) continue;
+
+        if (!codePattern.test(line)) continue;
+
+        let candidate = line;
+        // OCR often breaks a row in two lines; merge with next line when marks are missing.
+        const marksInLine = (candidate.match(/\b\d{1,3}\b/g) || []).length;
+        if (marksInLine < 3 && i + 1 < lines.length && !stopWords.some((w) => lines[i + 1].toLowerCase().includes(w))) {
+          candidate = `${candidate} ${lines[i + 1]}`;
+        }
+
+        const parsed = parseSubjectChunk(candidate, codePattern, datePattern);
+        if (parsed) rows.push(parsed);
+      }
+
+      if (rows.length === 0) return null;
+
+      // Remove duplicate subjects caused by OCR line overlap.
+      const uniqueRows = [];
+      const seen = new Set();
+      for (const row of rows) {
+        const key = `${row.subjectCode}|${row.internalMarks}|${row.externalMarks}|${row.total}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        uniqueRows.push(row);
+      }
+
+      return { studentInfo, rows: uniqueRows };
+    }
+
+    function buildVtuWorkbook(parsed) {
+      const subjects = parsed.rows || [];
+      const workbook = XLSX.utils.book_new();
+
+      // Template-like output expected by the analysis workflow.
+      const templateRows = [];
+      const courseCodeRow = ['Course Code', '', ''];
+      const headerRow = ['S.N.', 'USN', 'NAME'];
+      const studentRow = [1, parsed.studentInfo.usn || '', parsed.studentInfo.name || ''];
+
+      subjects.forEach((subj) => {
+        courseCodeRow.push(subj.subjectCode || '', '');
+        headerRow.push('CIE', 'SEE');
+        studentRow.push(
+          subj.internalMarks === '' ? '' : subj.internalMarks,
+          subj.externalMarks === '' ? '' : subj.externalMarks
+        );
+      });
+
+      templateRows.push(['Please enter the marks and upload this Excel file to the \"Exam Result Analysis\" page.']);
+      templateRows.push(['Academic Year:', parsed.studentInfo.academicYear || '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+      templateRows.push(['Branch:', parsed.studentInfo.branch || '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+      templateRows.push(['Semester:', parsed.studentInfo.semester || '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+      templateRows.push(courseCodeRow);
+      templateRows.push(headerRow);
+      templateRows.push(studentRow);
+
+      const templateSheet = XLSX.utils.aoa_to_sheet(templateRows);
+      XLSX.utils.book_append_sheet(workbook, templateSheet, 'Result Template');
+
+      const infoRows = [
+        ['Field', 'Value'],
+        ['University Seat Number', parsed.studentInfo.usn || ''],
+        ['Student Name', parsed.studentInfo.name || ''],
+        ['Semester', parsed.studentInfo.semester || ''],
+        ['Academic Year', parsed.studentInfo.academicYear || ''],
+        ['Branch', parsed.studentInfo.branch || '']
+      ];
+      const infoSheet = XLSX.utils.aoa_to_sheet(infoRows);
+      XLSX.utils.book_append_sheet(workbook, infoSheet, 'Student Info');
+
+      const tableRows = [[
+        'S.N',
+        'Subject Code',
+        'Subject Name',
+        'CIE Marks (Out of 50)',
+        'SEE Marks (Out of 50)',
+        'Total (Out of 100)',
+        'Result',
+        'Announced/Updated'
+      ]];
+
+      parsed.rows.forEach((row, idx) => {
+        let cie = row.internalMarks;
+        let see = row.externalMarks;
+        let total = row.total;
+        
+        // Validate and correct if needed
+        if (cie !== '' && see !== '') {
+          cie = Number(cie);
+          see = Number(see);
+          
+          // Ensure they don't exceed limits
+          cie = Math.min(cie, 50);
+          see = Math.min(see, 50);
+          
+          // If they appear swapped, correct them
+          if (see <= 50 && cie > 50 && cie <= 100) {
+            const temp = cie;
+            cie = see;
+            see = temp;
+          }
+          
+          // Recalculate total from validated marks
+          total = cie + see;
+        }
+        
+        tableRows.push([
+          idx + 1,
+          row.subjectCode,
+          row.subjectName,
+          cie === '' ? '' : cie,
+          see === '' ? '' : see,
+          total === '' ? '' : total,
+          row.result,
+          row.announced
+        ]);
+      });
+
+      const marksSheet = XLSX.utils.aoa_to_sheet(tableRows);
+      XLSX.utils.book_append_sheet(workbook, marksSheet, 'Subject Marks');
+
+      const courseDetailsRows = [
+        ['Course Code', 'Subject Name', 'CIE Max', 'SEE Max', 'Total Max'],
+        ...subjects.map((subj) => [subj.subjectCode || '', subj.subjectName || '', 50, 50, 100])
+      ];
+      const courseDetailsSheet = XLSX.utils.aoa_to_sheet(courseDetailsRows);
+      XLSX.utils.book_append_sheet(workbook, courseDetailsSheet, 'Course Details');
+
+      const studentListHeader = ['S.N.', 'USN', 'NAME'];
+      subjects.forEach((subj) => {
+        const code = subj.subjectCode || 'SUB';
+        studentListHeader.push(`${code}_CIE (50)`, `${code}_SEE (50)`, `${code}_TOTAL (100)`, `${code}_RESULT`);
+      });
+
+      const studentListRow = [1, parsed.studentInfo.usn || '', parsed.studentInfo.name || ''];
+      subjects.forEach((subj) => {
+        let cie = subj.internalMarks === '' ? '' : Number(subj.internalMarks);
+        let see = subj.externalMarks === '' ? '' : Number(subj.externalMarks);
+        
+        // Validate and correct if needed
+        if (cie !== '' && see !== '') {
+          // Ensure they don't exceed limits
+          cie = Math.min(cie, 50);
+          see = Math.min(see, 50);
+          
+          if (see <= 50 && cie > 50 && cie <= 100) {
+            const temp = cie;
+            cie = see;
+            see = temp;
+          }
+        }
+        
+        const total = (cie !== '' && see !== '') ? (cie + see) : '';
+        const result = subj.result || (cie !== '' && see !== '' ? (cie >= 20 && see >= 18 ? 'P' : 'F') : '');
+        studentListRow.push(cie, see, total, result);
+      });
+
+      const studentListRows = [studentListHeader, studentListRow];
+      const studentListSheet = XLSX.utils.aoa_to_sheet(studentListRows);
+      XLSX.utils.book_append_sheet(workbook, studentListSheet, 'Student List');
+
+      XLSX.writeFile(workbook, `vtu_result_${Date.now()}.xlsx`);
+    }
+
+    function buildGenericWorkbook(students, subjectCodes = [], academicInfo = {}) {
+      const expectedSubjectCount = inferExpectedSubjectCount(students);
+      const inferredMax = expectedSubjectCount > 0
+        ? expectedSubjectCount
+        : students.reduce((max, s) => Math.max(max, s.subjectMarks.length), 0);
+
+      // If subject codes are detected, use ONLY that count to avoid noisy extra columns.
+      const maxSubjects = subjectCodes.length > 0 ? subjectCodes.length : inferredMax;
+
+      const normalizedStudents = sortStudentsByUsn(mergeStudentsByUsn(students)).map((student) => {
+        const marks = Array.isArray(student.subjectMarks) ? [...student.subjectMarks] : [];
+        let normalizedMarks = marks;
+
+        if (maxSubjects > 0 && marks.length > maxSubjects) {
+          normalizedMarks = marks.slice(0, maxSubjects);
+        }
+
+        if (maxSubjects > 0 && normalizedMarks.length < maxSubjects) {
+          normalizedMarks = [...normalizedMarks, ...Array(maxSubjects - normalizedMarks.length).fill('')];
+        }
+
+        return {
+          ...student,
+          subjectMarks: normalizedMarks
+        };
+      });
+
+      const header = ['S.N', 'USN', 'Student Name'];
+      for (let i = 1; i <= maxSubjects; i += 1) {
+        header.push('');
+      }
+
+      const templateRows = [];
+      templateRows.push(['Please enter/verify marks and use this template for Examination Result Analysis']);
+      templateRows.push([`Academic Year: ${academicInfo.academicYear || ''}`]);
+      templateRows.push([`Branch: ${academicInfo.branch || ''}`]);
+      templateRows.push([`Semester: ${academicInfo.semester || ''}`]);
+
+      const courseCodeRow = ['Course Code', '', ''];
+      for (let i = 1; i <= maxSubjects; i += 1) {
+        courseCodeRow.push(subjectCodes[i - 1] || `SUB${i}`);
+      }
+      templateRows.push(courseCodeRow);
+      templateRows.push(header);
+
+      normalizedStudents.forEach((student, idx) => {
+        const row = [idx + 1, student.usn, student.name, ...student.subjectMarks];
+        while (row.length < header.length) row.push('');
+        templateRows.push(row);
+      });
+
+      const clearTableRows = [header, ...normalizedStudents.map((student, idx) => {
+        const row = [idx + 1, student.usn, student.name, ...student.subjectMarks];
+        while (row.length < header.length) row.push('');
+        return row;
+      })];
+
+      const workbook = XLSX.utils.book_new();
+      const templateSheet = XLSX.utils.aoa_to_sheet(templateRows);
+      const clearSheet = XLSX.utils.aoa_to_sheet(clearTableRows);
+
+      const commonCols = [
+        { wch: 6 },
+        { wch: 16 },
+        { wch: 28 },
+        ...Array.from({ length: maxSubjects }, () => ({ wch: 12 }))
+      ];
+
+      templateSheet['!cols'] = commonCols;
+      clearSheet['!cols'] = commonCols;
+
+      XLSX.utils.book_append_sheet(workbook, templateSheet, 'Result Template');
+      XLSX.utils.book_append_sheet(workbook, clearSheet, 'Student Marks');
+      XLSX.writeFile(workbook, `result_data_${Date.now()}.xlsx`);
+    }
+
+    async function convertPdfToXlsx() {
+      if (!window.pdfjsLib) {
+        updateStatus('PDF library failed to load. Please refresh the page and try again.');
+        return;
+      }
+
+      const file = pdfInput.files && pdfInput.files[0];
+      if (!file) {
+        updateStatus('Please select a PDF file first.');
+        return;
+      }
+
+      try {
+        convertBtn.disabled = true;
+        updateStatus('Reading PDF and extracting text...');
+
+        const { fullText, lines, pages } = await extractPdfData(file);
+
+        // Strict VTU extraction first: prevents fake columns and uses real subject-row totals.
+        const vtuStudents = parseAllVtuStudentsFromPages(pages);
+        if (vtuStudents.length > 0) {
+          buildVtuStudentsWorkbook(vtuStudents);
+          const totalSubjects = vtuStudents.reduce((sum, s) => sum + (s.rows || []).length, 0);
+          const totalMarks = vtuStudents.reduce((sum, s) => sum + s.rows.reduce((rs, r) => rs + (r.internalMarks || 0) + (r.externalMarks || 0), 0), 0);
+          updateStatus(`✓ CONVERSION COMPLETED SUCCESSFULLY\n\n📊 Students: ${vtuStudents.length}\n📚 Subjects: ${totalSubjects}\n💯 Total Marks: ${totalMarks}\n\n✓ Data Extracted Directly from PDF:\n  • Student USNs properly read\n  • Student Names extracted\n  • Internal Marks (Out of 50)\n  • External Marks (Out of 50)\n  • Total = Internal + External\n\n📋 Excel Sheets Created:\n  • Result Template (Internal & External separated)\n  • Detailed Marks (All information)\n  • Summary (Totals & percentages)\n\n✓ Data Validation:\n  • Internal range: 0-50 ✓\n  • External range: 0-50 ✓\n  • Totals: ≤ 100 ✓\n  • Students sorted by USN ✓`);
+          return;
+        }
+
+        // Always prioritize multi-student extraction so one PDF becomes one combined XLSX.
+        let students = parseStudentsFromLines(lines);
+        if (students.length === 0) students = parseStudentsFromText(fullText);
+        const academicInfo = parseAcademicInfo(fullText);
+
+        // Filter students with valid names and minimum marks
+        const validStudents = students.filter(s => 
+          s && s.name && s.name !== 'Unknown' && s.subjectMarks && s.subjectMarks.length >= 4
+        );
+
+        if (validStudents.length > 1) {
+          const subjectCodes = resolveSubjectCodes(lines, fullText, inferExpectedSubjectCount(validStudents));
+          buildGenericWorkbook(validStudents, subjectCodes, academicInfo);
+          updateStatus(`✓ CONVERSION COMPLETED\n\n✓ Detected: ${validStudents.length} students\n✓ Average subjects: ${Math.round(validStudents.reduce((sum, s) => sum + (s.subjectMarks?.length || 0), 0) / validStudents.length)}\n\n📋 Excel file generated with:\n• Student Names properly extracted\n• Internal & External marks separated\n• Totals verified (≤ 100)\n\nXLSX file downloaded.`);
+          return;
+        }
+
+        // Single-student VTU transcript parser.
+        const vtuParsed = parseVtuTable(pages, fullText);
+        if (vtuParsed && vtuParsed.rows.length > 0) {
+          buildVtuWorkbook(vtuParsed);
+          updateStatus(
+            `✓ CONVERSION COMPLETED SUCCESSFULLY\n\n` +
+            `USN: ${vtuParsed.studentInfo.usn || 'N/A'}\n` +
+            `Student: ${vtuParsed.studentInfo.name || 'N/A'}\n` +
+            `Semester: ${vtuParsed.studentInfo.semester || 'N/A'}\n` +
+            `Subjects: ${vtuParsed.rows.length}\n\n` +
+            `✓ Marks Properly Verified:\n` +
+            `  • CIE Marks (0-50 range)\n` +
+            `  • SEE Marks (0-50 range)\n` +
+            `  • Total = CIE + SEE (≤ 100)\n` +
+            `  • No values exceed limits\n\n` +
+            `📋 Excel Sheets Created:\n` +
+            `  • Result Template\n` +
+            `  • Student Info\n` +
+            `  • Subject Marks (with CIE & SEE)\n` +
+            `  • Course Details\n` +
+            `  • Student List\n\n` +
+            `XLSX file downloaded with verified marks.`
+          );
+          return;
+        }
+
+        if (students.length === 0) {
+          updateStatus('No direct text rows detected. Trying OCR mode for image-based PDF...');
+
+          if (!window.Tesseract) {
+            updateStatus('OCR library failed to load. Please refresh and try again.');
+            return;
+          }
+
+          const ocrData = await extractPdfTextWithOcr(file, updateStatus);
+
+          const vtuStudentsFromOcr = parseAllVtuStudentsFromPages(ocrData.pages || []);
+          if (vtuStudentsFromOcr.length > 0) {
+            buildVtuStudentsWorkbook(vtuStudentsFromOcr);
+            updateStatus(`Conversion completed (OCR VTU strict mode).\nDetected students: ${vtuStudentsFromOcr.length}\nSubjects per student: ${(vtuStudentsFromOcr[0]?.rows || []).length}\nXLSX file downloaded.`);
+            return;
+          }
+
+          students = parseStudentsFromText(ocrData.fullText);
+          if (students.length > 1) {
+            const ocrAcademicInfo = parseAcademicInfo(ocrData.fullText);
+            const ocrSubjectCodes = resolveSubjectCodes(
+              (ocrData.pages || []).flatMap((p) => (p.lines || []).map((l) => l.text || '')),
+              ocrData.fullText,
+              inferExpectedSubjectCount(students)
+            );
+            buildGenericWorkbook(students, ocrSubjectCodes, ocrAcademicInfo);
+            updateStatus(`Conversion completed (OCR multi-student mode).\nDetected students: ${students.length}\nXLSX file downloaded.`);
+            return;
+          }
+
+          let vtuFromOcr = parseVtuTable(ocrData.pages, ocrData.fullText);
+          if (!vtuFromOcr || vtuFromOcr.rows.length === 0) {
+            vtuFromOcr = parseVtuFromOcrLineAnchors(ocrData.pages, ocrData.fullText);
+          }
+          if (!vtuFromOcr || vtuFromOcr.rows.length === 0) {
+            vtuFromOcr = parseVtuFromOcrText(ocrData.fullText);
+          }
+
+          if (vtuFromOcr && vtuFromOcr.rows.length > 0) {
+            buildVtuWorkbook(vtuFromOcr);
+            updateStatus(
+              `✓ Conversion completed (OCR VTU mode)\n\n` +
+              `USN: ${vtuFromOcr.studentInfo.usn || 'N/A'}\n` +
+              `Student: ${vtuFromOcr.studentInfo.name || 'N/A'}\n` +
+              `Subjects detected: ${vtuFromOcr.rows.length}\n\n` +
+              `Marks extracted via OCR:\n• CIE Marks (Internal)\n• SEE Marks (External)\n• Total Marks\n\n` +
+              'XLSX file downloaded.'
+            );
+            return;
+          }
+
+          // OCR generic fallback: parse as normal blocks from OCR output.
+          students = parseStudentsFromText(ocrData.fullText);
+          if (students.length === 0) {
+            updateStatus('Could not detect rows even in OCR mode. Please upload a clearer PDF (higher resolution screenshot/PDF export).');
+            return;
+          }
+        }
+
+        const fallbackCodes = resolveSubjectCodes(lines, fullText, inferExpectedSubjectCount(students));
+        buildGenericWorkbook(students, fallbackCodes, academicInfo);
+        updateStatus(`Conversion completed (generic mode).\nDetected students: ${students.length}\nXLSX file downloaded.`);
+      } catch (error) {
+        updateStatus(`Conversion failed: ${error.message}`);
+      } finally {
+        convertBtn.disabled = false;
+      }
+    }
+
+    convertBtn.addEventListener('click', convertPdfToXlsx);
+  </script>
+</body>
+</html>

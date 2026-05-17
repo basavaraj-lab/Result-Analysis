@@ -47,19 +47,13 @@ body {
     background-color: white;
 }
 .navbar{
-    height: 200px;
     width: 100%;
     background-color: #003366;
     color: white;
-    padding: 20px 10px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
     text-align: center;
 }
 .nav-title {
-    font-size: 60px;
+    font-size: 40px;
     font-weight: bold;
     margin: 0;
     line-height: 1.2;
@@ -77,6 +71,13 @@ body {
     margin: 8px 0 0 0;
     font-weight: bold;
     line-height: 1.2;
+}
+.nav-sub3 {
+    font-size: 40px;
+    margin: 8px 0 0 0;
+    font-weight: bold;
+    line-height: 1.2;
+    color: white;
 }
 
 .data{
